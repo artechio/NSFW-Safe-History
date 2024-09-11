@@ -56,7 +56,7 @@ chrome.runtime.onInstalled.addListener(() => {
         id: "provideFeedback", // Ensure this id is unique
         title: "Provide feedback on this domain",
         contexts: ["all"],
-        onclick: contextMenuClicked
+        // onclick: contextMenuClicked
     });
 
     // Initialize storage with an empty keyword list if not present
@@ -68,6 +68,13 @@ chrome.runtime.onInstalled.addListener(() => {
 
     // Initialize the switchOn flag
     chrome.storage.sync.set({ switchOn: true });
+});
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === "provideFeedback") {
+        contextMenuClicked(info, tab);
+    }
 });
 
 // Listen for messages from popup and content scripts
