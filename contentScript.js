@@ -1,5 +1,3 @@
-// contentScript.js
-
 // Function to load keywords from keyword.txt
 function loadKeywords(callback) {
     fetch(chrome.runtime.getURL('keyword.txt'))
@@ -29,5 +27,22 @@ function checkForKeywords(keywords) {
     }
 }
 
-// Load keywords and check the page content
-loadKeywords(checkForKeywords);
+// Function to check if the current site is excluded
+function isSiteExcluded(callback) {
+    const url = new URL(window.location.href);
+    const domain = url.hostname;
+
+    chrome.storage.sync.get('excludedSites', (data) => {
+        const excludedSites = data.excludedSites || [];
+        callback(excludedSites.includes(domain));
+    });
+}
+
+// Load keywords and check the page content unless the site is excluded
+isSiteExcluded((isExcluded) => {
+    if (!isExcluded) {
+        loadKeywords(checkForKeywords);
+    } else {
+        console.log(`This site (${window.location.hostname}) is excluded.`);
+    }
+});
