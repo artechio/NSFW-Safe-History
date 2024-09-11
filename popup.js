@@ -3,8 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const addKeywordButton = document.getElementById('addKeyword');
     const keywordList = document.getElementById('keywordList');
     const clearHistoryButton = document.getElementById('clearHistory');
-    const excludeSiteButton = document.getElementById('excludeSite');
-    const excludedSitesList = document.getElementById('excludedSitesList');
+    const excludeToggle = document.getElementById('excludeToggle');
+    const defaultKeywordsToggle = document.getElementById('defaultKeywordsToggle');
+    const excludeToggleLabel = document.getElementById('excludeToggleLabel');
 
     let currentSiteDomain = '';
 
@@ -16,36 +17,81 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const excludedSites = items.excludedSites || [];
-        excludedSites.forEach((site, index) => {
-            addExcludedSiteToList(site, index);
-        });
+        updateExcludeToggleState(excludedSites); // Update exclude toggle state for the current site
     });
 
     // Function to check if the current site is excluded
-    function updateExcludeSiteButtonState() {
+    function updateExcludeToggleState(excludedSites) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             const url = new URL(tabs[0].url);
             currentSiteDomain = url.hostname;
 
-            chrome.storage.sync.get('excludedSites', (items) => {
-                const excludedSites = items.excludedSites || [];
-                if (excludedSites.includes(currentSiteDomain)) {
-                    excludeSiteButton.disabled = true;
-                    excludeSiteButton.textContent = 'Site Excluded';
-                    excludeSiteButton.classList.add('bg-gray-400', 'cursor-not-allowed');
-                    excludeSiteButton.classList.remove('bg-red-500', 'hover:bg-red-600');
-                } else {
-                    excludeSiteButton.disabled = false;
-                    excludeSiteButton.textContent = 'Exclude this site';
-                    excludeSiteButton.classList.add('bg-red-500', 'hover:bg-red-600');
-                    excludeSiteButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                }
-            });
+            // Check if the current site is in the excludedSites list
+            if (excludedSites.includes(currentSiteDomain)) {
+                excludeToggle.checked = false; // Site is excluded, filter is off
+                updateExcludeToggleLabel(false); // Show "Filter is NOT active"
+            } else {
+                excludeToggle.checked = true; // Filter is active for this site
+                updateExcludeToggleLabel(true); // Show "Filter is active"
+            }
         });
     }
 
-    // Initial call to update the button state when popup opens
-    updateExcludeSiteButtonState();
+    // Handle toggling filter on/off for the current site
+    excludeToggle.addEventListener('change', () => {
+        chrome.storage.sync.get('excludedSites', (items) => {
+            let excludedSites = items.excludedSites || [];
+
+            if (excludeToggle.checked) {
+                // Remove current site from excludedSites (enable filter for this site)
+                excludedSites = excludedSites.filter(site => site !== currentSiteDomain);
+                updateExcludeToggleLabel(true); // Show "Filter is active"
+            } else {
+                // Add current site to excludedSites (disable filter for this site)
+                if (!excludedSites.includes(currentSiteDomain)) {
+                    excludedSites.push(currentSiteDomain);
+                }
+                updateExcludeToggleLabel(false); // Show "Filter is NOT active"
+            }
+
+            // Save the updated excludedSites list
+            chrome.storage.sync.set({ excludedSites: excludedSites });
+        });
+    });
+
+    // Clear NSFW history except for excluded sites
+    clearHistoryButton.addEventListener('click', () => {
+        chrome.storage.sync.get(['excludedSites', 'keywords'], (items) => {
+            const excludedSites = items.excludedSites || [];
+            const keywords = (items.keywords || []).map(keyword => keyword.data.toLowerCase());
+
+            chrome.history.search({ text: '', startTime: 0 }, (historyItems) => {
+                historyItems.forEach(item => {
+                    const url = new URL(item.url);
+                    const domain = url.hostname;
+
+                    if (!excludedSites.includes(domain)) {
+                        const title = item.title.toLowerCase();
+                        const matchedKeyword = keywords.some(keyword => title.includes(keyword));
+
+                        // Delete history items only if they match the NSFW keywords
+                        if (matchedKeyword) {
+                            chrome.history.deleteUrl({ url: item.url });
+                        }
+                    }
+                });
+            });
+        });
+    });
+
+    // Function to update the label for exclude toggle
+    function updateExcludeToggleLabel(isFilterActive) {
+        if (isFilterActive) {
+            excludeToggleLabel.textContent = "Filter is active for this website";
+        } else {
+            excludeToggleLabel.textContent = "Filter is NOT active for this website";
+        }
+    }
 
     // Add new keyword to the list
     addKeywordButton.addEventListener('click', () => {
@@ -62,58 +108,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Clear NSFW history based on keywords
-    clearHistoryButton.addEventListener('click', () => {
-        chrome.storage.sync.get(['excludedSites', 'keywords'], (items) => {
-            const excludedSites = items.excludedSites || [];
-            const keywords = (items.keywords || []).map(keyword => keyword.data.toLowerCase());
-
-            chrome.history.search({ text: '', startTime: 0 }, (historyItems) => {
-                historyItems.forEach(item => {
-                    const url = new URL(item.url);
-                    const domain = url.hostname;
-
-                    if (!excludedSites.includes(domain)) {
-                        const title = item.title.toLowerCase();
-                        const matchedKeyword = keywords.some(keyword => title.includes(keyword));
-
-                        if (matchedKeyword) {
-                            chrome.history.deleteUrl({ url: item.url });
-                        }
-                    }
-                });
-            });
-        });
-    });
-
-    // Exclude the current site
-    excludeSiteButton.addEventListener('click', () => {
-        chrome.storage.sync.get('excludedSites', (items) => {
-            const excludedSites = items.excludedSites || [];
-
-            if (!excludedSites.includes(currentSiteDomain)) {
-                excludedSites.push(currentSiteDomain);
-                chrome.storage.sync.set({ excludedSites }, () => {
-                    addExcludedSiteToList(currentSiteDomain, excludedSites.length - 1);
-                    updateExcludeSiteButtonState(); // Update button state after exclusion
-                });
-            } else {
-                alert(`Site already excluded: ${currentSiteDomain}`);
-            }
-        });
-    });
-
     // Function to add keyword to the list
     function addKeywordToList(keyword, index) {
         const li = document.createElement('li');
-        li.className = 'flex items-center justify-between bg-gray-200 p-2 rounded-md';
-        li.innerHTML = `<span>${keyword}</span>`;
+        li.className = 'flex items-center justify-between bg-gray-800 text-white p-2 rounded-md';
+
+        const keywordSpan = document.createElement('span');
+        keywordSpan.textContent = keyword;
+
         const removeButton = document.createElement('button');
         removeButton.className = 'text-red-500 hover:text-red-700';
-        removeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#e34a4a" viewBox="0 0 256 256"><path d="M224,56a8,8,0,0,1-8,8h-8V208a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,56ZM88,32h80a8,8,0,0,0,0-16H88a8,8,0,0,0,0,16Z"></path></svg>`;
+
+        const trashIcon = document.createElement('img');
+        trashIcon.src = 'assets/trash.svg'; // Use external trash icon
+        trashIcon.alt = 'Delete';
+        trashIcon.className = 'h-5 w-5';
+
+        removeButton.appendChild(trashIcon);
         removeButton.addEventListener('click', () => {
             removeKeyword(index);
         });
+
+        li.appendChild(keywordSpan);
         li.appendChild(removeButton);
         keywordList.appendChild(li);
     }
@@ -122,43 +138,33 @@ document.addEventListener('DOMContentLoaded', () => {
     function removeKeyword(index) {
         chrome.storage.sync.get('keywords', (items) => {
             const keywords = items.keywords || [];
-            keywords.splice(index, 1);
+            keywords.splice(index, 1); // Remove keyword
             chrome.storage.sync.set({ keywords: keywords }, () => {
-                keywordList.innerHTML = '';
+                keywordList.innerHTML = ''; // Clear the list
                 keywords.forEach((keyword, idx) => {
-                    addKeywordToList(keyword.data, idx);
+                    addKeywordToList(keyword.data, idx); // Re-render list
                 });
             });
         });
     }
 
-    // Function to add excluded site to the list with a remove button
-    function addExcludedSiteToList(site, index) {
-        const li = document.createElement('li');
-        li.className = 'flex items-center justify-between bg-gray-200 p-2 rounded-md';
-        li.innerHTML = `<span>${site}</span>`;
-        const removeButton = document.createElement('button');
-        removeButton.className = 'text-red-500 hover:text-red-700';
-        removeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#e34a4a" viewBox="0 0 256 256"><path d="M224,56a8,8,0,0,1-8,8h-8V208a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,56ZM88,32h80a8,8,0,0,0,0-16H88a8,8,0,0,0,0,16Z"></path></svg>`;
-        removeButton.addEventListener('click', () => {
-            removeExcludedSite(index);
-        });
-        li.appendChild(removeButton);
-        excludedSitesList.appendChild(li);
-    }
+    // Load defaultKeywordsEnabled state from chrome storage on popup open
+    chrome.storage.sync.get(['defaultKeywordsEnabled'], (data) => {
+        if (data.defaultKeywordsEnabled !== undefined) {
+            defaultKeywordsToggle.checked = data.defaultKeywordsEnabled;
+        } else {
+            defaultKeywordsToggle.checked = true; // Default to true
+            chrome.storage.sync.set({ defaultKeywordsEnabled: true });
+        }
+    });
 
-    // Function to remove excluded site
-    function removeExcludedSite(index) {
-        chrome.storage.sync.get('excludedSites', (items) => {
-            const excludedSites = items.excludedSites || [];
-            excludedSites.splice(index, 1);
-            chrome.storage.sync.set({ excludedSites: excludedSites }, () => {
-                excludedSitesList.innerHTML = '';
-                excludedSites.forEach((site, idx) => {
-                    addExcludedSiteToList(site, idx);
-                });
-                updateExcludeSiteButtonState(); // Update button state after re-inclusion
-            });
-        });
-    }
+    // Toggle inclusion/exclusion of default keywords
+    defaultKeywordsToggle.addEventListener('change', () => {
+        chrome.storage.sync.set({ defaultKeywordsEnabled: defaultKeywordsToggle.checked });
+        if (defaultKeywordsToggle.checked) {
+            console.log('Default NSFW keywords enabled.');
+        } else {
+            console.log('Default NSFW keywords disabled.');
+        }
+    });
 });

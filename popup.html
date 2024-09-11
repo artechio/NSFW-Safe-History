@@ -1,43 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Popup</title>
+    <!-- Tailwind CSS -->
     <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="assets/style.css" rel="stylesheet">
 </head>
-<body class="p-4 bg-gray-100 mx-auto rounded-lg shadow-lg" style="width: 20rem;">
-    <h1 class="text-lg text-center font-bold dark:text-white">NSFW Safe History 
-        <span class="bg-blue-100 text-blue-800 text-lg font-semibold me-2 px-2.5 py-0.5 rounded dark:bg-blue-200 dark:text-blue-800 ms-2">PRO</span>
+
+<body class="p-4 bg-gray-900 text-white mx-auto rounded-lg shadow-lg" style="width: 20rem;">
+
+    <!-- Name of extension -->
+    <h1 class="text-lg text-center font-bold mb-4">NSFW Safe History 
+        <span class="bg-blue-100 text-blue-800 text-lg font-semibold px-2.5 py-0.5 rounded ms-2">PRO</span>
     </h1>
 
-    <!-- Divider and Section for Clear NSFW History -->
-    <div class="border-b-2 border-gray-300 my-4"></div>
-    <button id="clearHistory" class="w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Clear NSFW History Now!</button>
+    <!-- Divider -->
+    <div class="border-b border-gray-700 my-4"></div>
 
-    <!-- Divider and Section for Adding NSFW Keyword -->
-    <div class="border-b-2 border-gray-300 my-4"></div>
-    <div class="pt-4">
-        <label for="keywordInput" class="block text-sm font-medium text-gray-700">Add NSFW Keyword</label>
-        <input type="text" id="keywordInput" class="mt-1 block w-full h-12 px-4 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter keyword">
+    <!-- Section for website filter -->
+    <div class="mb-4">
+        <h2 class="text-sm font-medium mb-2">Settings for this website</h2>
+        <label class="flex items-center justify-between">
+            <span id="excludeToggleLabel">Filter is active for this website</span>
+            <input id="excludeToggle" type="checkbox" class="toggle-checkbox">
+        </label>
+    </div>
+
+    <!-- Divider -->
+    <div class="border-b border-gray-700 my-4"></div>
+
+    <!-- Section: Add NSFW Keyword -->
+    <div class="mb-4">
+        <h2 class="text-sm font-medium mb-2">Add NSFW Keyword</h2>
+        <input type="text" id="keywordInput" class="mt-1 block w-full h-12 px-4 border border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-800 text-white border-gray-700 focus:ring-gray-500 focus:border-gray-500 sm:text-sm dark:bg-gray-800 dark:text-white" placeholder="Enter keyword">
         <button id="addKeyword" class="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 w-full">Add Keyword</button>
     </div>
 
-    <ul id="keywordList" class="mt-4 space-y-2">
-        <!-- Keywords will be added here -->
+    <ul id="keywordList" class="space-y-2 mb-4 dark:bg-gray-800 dark:text-white">
+        <!-- Keywords will be dynamically added here -->
     </ul>
 
-    <!-- Divider and Section for Excluded Sites -->
-    <div class="border-b-2 border-gray-300 my-4"></div>
-    <h3 class="block text-sm font-medium text-gray-700">Excluded Sites</h3>
-    <ul id="excludedSitesList" class="space-y-2 mt-2">
-        <!-- Excluded sites will be listed here -->
-    </ul>
+    <!-- Divider -->
+    <div class="border-b border-gray-700 my-4"></div>
 
-    <button id="excludeSite" class="mt-2 w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">
-        Exclude this site
-    </button>      
+    <!-- Section: Clear NSFW History -->
+    <div class="mb-4">
+        <h2 class="text-sm font-medium mb-2">Clear NSFW History</h2>
+        <button id="clearHistory" class="w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Clear NSFW History Now!</button>
+    </div>
 
     <script src="popup.js"></script>
 </body>
+
 </html>

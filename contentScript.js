@@ -1,6 +1,6 @@
-// Function to load keywords from keyword.txt
+// Function to load keywords from assets/keyword.txt
 function loadKeywords(callback) {
-    fetch(chrome.runtime.getURL('keyword.txt'))
+    fetch(chrome.runtime.getURL('assets/keyword.txt'))
         .then(response => response.text())
         .then(text => {
             // Split text into lines (assuming each keyword is on a new line)

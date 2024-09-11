@@ -16,16 +16,16 @@
     "action": {
       "default_popup": "popup.html",
       "default_icon": {
-        "16": "clock-counter-clockwise.png",
-        "48": "clock-counter-clockwise.png",
-        "128": "clock-counter-clockwise.png"
+        "16": "assets/icon.png",
+        "48": "assets/icon.png",
+        "128": "assets/icon.png"
       }
     },
     "options_page": "options.html",
     "icons": {
-      "16": "clock-counter-clockwise.png",
-      "48": "clock-counter-clockwise.png",
-      "128": "clock-counter-clockwise.png"
+      "16": "assets/icon.png",
+      "48": "assets/icon.png",
+      "128": "assets/icon.png"
     },
     "content_scripts": [
       {
@@ -35,7 +35,7 @@
     ],
     "web_accessible_resources": [
         {
-          "resources": ["keyword.txt"],
+          "resources": ["assets/keyword.txt"],
           "matches": ["<all_urls>"]
         }
       ],
