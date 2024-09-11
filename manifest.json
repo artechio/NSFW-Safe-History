@@ -1,0 +1,46 @@
+{
+    "manifest_version": 3,
+    "name": "NSFW Safe History",
+    "version": "1.0",
+    "description": "Scans web pages for adult or NSFW content and removes them from your browsing history.",
+    "permissions": [
+        "history",
+        "storage",
+        "tabs",
+        "contextMenus",
+        "activeTab"
+      ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "action": {
+      "default_popup": "popup.html",
+      "default_icon": {
+        "16": "clock-counter-clockwise.png",
+        "48": "clock-counter-clockwise.png",
+        "128": "clock-counter-clockwise.png"
+      }
+    },
+    "options_page": "options.html",
+    "icons": {
+      "16": "clock-counter-clockwise.png",
+      "48": "clock-counter-clockwise.png",
+      "128": "clock-counter-clockwise.png"
+    },
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["contentScript.js"]
+      }
+    ],
+    "web_accessible_resources": [
+        {
+          "resources": ["keyword.txt"],
+          "matches": ["<all_urls>"]
+        }
+      ],
+    "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'"
+    }
+  }
+  
