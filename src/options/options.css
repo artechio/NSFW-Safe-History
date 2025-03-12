@@ -114,3 +114,26 @@ input:checked + .slider:before {
   height: auto;
   margin-top: 10px;
 }
+
+
+/* Add to your existing CSS */
+.save-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    animation: fadeIn 0.3s, fadeOut 0.3s 1.7s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}

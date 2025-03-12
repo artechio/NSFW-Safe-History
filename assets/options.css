@@ -1,0 +1,187 @@
+/* General Styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 30px;
+    font-size: 24px;
+}
+
+h2 {
+    color: #2c3e50;
+    font-size: 20px;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 8px;
+}
+
+/* Sections */
+.section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Filter Categories */
+.filter-categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Image Settings */
+.image-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+input[type="range"] {
+    flex: 1;
+}
+
+input[type="number"] {
+    width: 80px;
+    padding: 5px;
+}
+
+/* History Settings */
+.history-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Never Save Settings */
+.never-save-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.never-save-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+/* Filter Lists */
+.filter-lists {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.filter-source {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.filter-source h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #2c3e50;
+}
+
+/* Form Elements */
+select, input[type="text"], input[type="date"] {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+select {
+    background-color: white;
+}
+
+button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    background-color: #3498db;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+button#reset {
+    background-color: #e74c3c;
+}
+
+button#reset:hover {
+    background-color: #c0392b;
+}
+
+/* Checkbox Styling */
+input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+}
+
+/* Actions */
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    .container {
+        padding: 15px;
+    }
+
+    .filter-categories {
+        grid-template-columns: 1fr;
+    }
+
+    .actions {
+        flex-direction: column;
+    }
+
+    button {
+        width: 100%;
+    }
+} 

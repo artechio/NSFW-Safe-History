@@ -9,75 +9,118 @@
   <div class="container">
     <h1>NSFW Safe History Settings</h1>
 
-    <!-- History Cleaning Settings -->
-    <div class="section mb-4">
-      <h2>History Cleaning Settings</h2>
-      
-      <div class="mb-4">
-        <label for="historyRange">Clean History From:</label>
-        <select id="historyRange">
-          <option value="1">Last 24 hours</option>
-          <option value="7">Last 7 days</option>
-          <option value="30">Last 30 days</option>
-          <option value="90">Last 90 days</option>
-          <option value="custom">Custom date range</option>
-        </select>
-      </div>
-
-      <div id="customDateContainer" class="mb-4 hidden">
-        <label for="customStartDate">Start Date:</label>
-        <input type="date" id="customStartDate" />
-      </div>
-
-      <div class="checkbox-wrapper">
-        <input type="checkbox" id="autoDelete" />
-        <label for="autoDelete">Automatically delete flagged pages from history</label>
-      </div>
-    </div>
-
-    <!-- Keywords Management -->
-    <div class="mb-4">
-      <h2>Keywords Management</h2>
-      
-      <!-- Default Keywords Section -->
-      <div class="section mb-4">
-        <div class="flex">
-          <h3>Default Keywords</h3>
-          <div class="checkbox-wrapper">
-            <input type="checkbox" id="useDefaultKeywords" />
-            <label for="useDefaultKeywords">Use default keywords</label>
-          </div>
+    <section class="section">
+      <h2>Filter Categories</h2>
+      <div class="filter-categories">
+        <div class="filter-item">
+          <input type="checkbox" id="adult-content" checked>
+          <label for="adult-content">Adult Content</label>
         </div>
-        
-        <div class="mb-4">
-          <textarea id="defaultKeywords" readonly></textarea>
+        <div class="filter-item">
+          <input type="checkbox" id="social-media">
+          <label for="social-media">Social Media</label>
+        </div>
+        <div class="filter-item">
+          <input type="checkbox" id="gambling">
+          <label for="gambling">Gambling</label>
+        </div>
+        <div class="filter-item">
+          <input type="checkbox" id="violence">
+          <label for="violence">Violence</label>
         </div>
       </div>
+    </section>
 
-      <!-- Custom Keywords Section -->
-      <div class="section mb-4">
-        <h3>Custom Keywords</h3>
-        
-        <div class="flex mb-4">
-          <input type="text" id="newKeyword" placeholder="Add a keyword" />
-          <button id="addKeyword" class="btn-primary">Add</button>
+    <section class="section">
+      <h2>Image Protection</h2>
+      <div class="image-settings">
+        <div class="setting-item">
+          <label for="blur-intensity">Blur Intensity:</label>
+          <input type="range" id="blur-intensity" min="5" max="30" value="20">
+          <span id="blur-value">20px</span>
         </div>
-
-        <div class="mb-4">
-          <textarea id="customKeywords" placeholder="One keyword per line"></textarea>
+        <div class="setting-item">
+          <label for="min-image-size">Minimum Image Size:</label>
+          <input type="number" id="min-image-size" min="32" max="256" value="64">
+          <span>px</span>
         </div>
-        
-        <div class="flex justify-end space-x-2">
-          <button id="importKeywords" class="btn-secondary">Import</button>
-          <button id="exportKeywords" class="btn-secondary">Export</button>
-          <button id="saveKeywords" class="btn-success">Save Changes</button>
+        <div class="setting-item">
+          <input type="checkbox" id="auto-blur" checked>
+          <label for="auto-blur">Automatically blur images on blocked sites</label>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Save Settings Button -->
-    <div class="flex justify-end">
-      <button id="saveSettings" class="btn-primary">Save All Settings</button>
+    <section class="section">
+      <h2>History Management</h2>
+      <div class="history-settings">
+        <div class="setting-item">
+          <input type="checkbox" id="auto-clean" checked>
+          <label for="auto-clean">Automatically clean history</label>
+        </div>
+        <div class="setting-item">
+          <label for="clean-interval">Clean history every:</label>
+          <select id="clean-interval">
+            <option value="1">1 day</option>
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+            <option value="custom">Custom date</option>
+          </select>
+        </div>
+        <div class="setting-item" id="custom-date-container" style="display: none;">
+          <label for="custom-date">Start from:</label>
+          <input type="date" id="custom-date">
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Never Save History</h2>
+      <div class="never-save-settings">
+        <div class="setting-item">
+          <input type="text" id="never-save-url" placeholder="Enter URL or domain">
+          <button id="add-never-save">Add</button>
+        </div>
+        <div class="never-save-list" id="never-save-list">
+          <!-- Never save URLs will be added here -->
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Filter Lists</h2>
+      <div class="filter-lists">
+        <div class="filter-source">
+          <h3>Adult Content</h3>
+          <select id="adult-list-source">
+            <option value="1hosts">1Hosts (Lite)</option>
+            <option value="energized">Energized Basic</option>
+            <option value="stevenblack">Steven Black</option>
+          </select>
+        </div>
+        <div class="filter-source">
+          <h3>Social Media</h3>
+          <select id="social-list-source">
+            <option value="1hosts">1Hosts (Social)</option>
+            <option value="energized">Energized Social</option>
+            <option value="stevenblack">Steven Black Social</option>
+          </select>
+        </div>
+        <div class="update-settings">
+          <label for="auto-update">Auto-update filter lists:</label>
+          <select id="auto-update">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="never">Never</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="save">Save Settings</button>
+      <button id="reset">Reset to Default</button>
     </div>
   </div>
 
