@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let currentSiteDomain = '';
+    let currentTabId = null;
 
     // Load current keywords and excluded sites on popup open
     chrome.storage.sync.get(['keywords', 'excludedSites', 'defaultKeywordsEnabled'], (items) => {
@@ -42,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const url = new URL(tabs[0].url);
                     currentSiteDomain = url.hostname;
+                    currentTabId = tabs[0].id;
 
                     elements.excludeToggle.checked = !excludedSites.includes(currentSiteDomain);
                     updateExcludeToggleLabel(elements.excludeToggle.checked);
@@ -59,6 +61,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (elements.excludeToggle.checked) {
                 excludedSites = excludedSites.filter(site => site !== currentSiteDomain);
+                if (currentTabId) {
+                    chrome.tabs.sendMessage(currentTabId, { action: 'ACTIVATE_FILTER' })
+                        .catch(error => console.warn('Tab not ready for filter activation'));
+                }
             } else if (!excludedSites.includes(currentSiteDomain)) {
                 excludedSites.push(currentSiteDomain);
             }
@@ -71,8 +77,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle default keywords toggle
     elements.defaultKeywordsToggle.addEventListener('change', () => {
-        chrome.storage.sync.set({ 
-            defaultKeywordsEnabled: elements.defaultKeywordsToggle.checked 
+        const settings = { defaultKeywordsEnabled: elements.defaultKeywordsToggle.checked };
+        chrome.runtime.sendMessage({ 
+            action: 'UPDATE_SETTINGS',
+            settings: settings 
+        }, response => {
+            if (chrome.runtime.lastError) {
+                console.warn('Settings update error:', chrome.runtime.lastError);
+                return;
+            }
+            if (response && response.success) {
+                showStatusMessage('Settings updated successfully', 'success');
+            }
         });
     });
 
@@ -81,7 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.clearHistory.disabled = true;
         elements.clearHistory.classList.add('opacity-50');
 
-        chrome.runtime.sendMessage({ action: 'clearMatchingHistory' }, () => {
+        chrome.runtime.sendMessage({ action: 'CLEAR_HISTORY' }, response => {
+            if (chrome.runtime.lastError) {
+                console.warn('History clear error:', chrome.runtime.lastError);
+                showStatusMessage('Error clearing history', 'error');
+                return;
+            }
+            
             showStatusMessage('History cleaning in progress...', 'info');
             
             // Re-enable button after a delay
@@ -107,6 +129,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const keywords = items.keywords || [];
                 keywords.push({ data: keyword });
                 chrome.storage.sync.set({ keywords }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.warn('Keyword save error:', chrome.runtime.lastError);
+                        showStatusMessage('Error saving keyword', 'error');
+                        return;
+                    }
                     addKeywordToList(keyword, keywords.length - 1);
                     elements.keywordInput.value = '';
                     showStatusMessage('Keyword added successfully', 'success');
@@ -146,6 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const keywords = items.keywords || [];
             keywords.splice(index, 1);
             chrome.storage.sync.set({ keywords }, () => {
+                if (chrome.runtime.lastError) {
+                    console.warn('Keyword remove error:', chrome.runtime.lastError);
+                    showStatusMessage('Error removing keyword', 'error');
+                    return;
+                }
                 elements.keywordList.innerHTML = '';
                 keywords.forEach((keyword, idx) => {
                     addKeywordToList(keyword.data, idx);
@@ -174,6 +206,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle opening options page
     elements.openOptions.addEventListener('click', (e) => {
         e.preventDefault();
-        chrome.runtime.openOptionsPage();
+        try {
+            chrome.runtime.openOptionsPage();
+        } catch (error) {
+            console.warn('Error opening options page:', error);
+            showStatusMessage('Error opening options page', 'error');
+        }
     });
 });
