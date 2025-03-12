@@ -1,0 +1,253 @@
+/* Base styles */
+body {
+    width: 320px;
+    min-height: 400px;
+    padding: 16px;
+    background-color: #111827;
+    color: white;
+    margin: 0 auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.title {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.version-badge {
+    background-color: #dbeafe;
+    color: #1e40af;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* Section styles */
+.section {
+    margin-bottom: 16px;
+    padding: 12px;
+    background-color: #1f2937;
+    border-radius: 8px;
+}
+
+/* Toggle switch */
+.toggle-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.toggle-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.toggle-status {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.toggle-checkbox {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    appearance: none;
+    background-color: #4b5563;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.toggle-checkbox:checked {
+    background-color: #3b82f6;
+}
+
+.toggle-checkbox::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    left: 2px;
+    top: 2px;
+    transition: transform 0.2s;
+}
+
+.toggle-checkbox:checked::after {
+    transform: translateX(16px);
+}
+
+/* Input styles */
+.input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.keyword-input {
+    flex: 1;
+    padding: 8px 12px;
+    background-color: #374151;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    color: white;
+    font-size: 14px;
+}
+
+.keyword-input::placeholder {
+    color: #9ca3af;
+}
+
+.keyword-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+/* Button styles */
+.btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: none;
+}
+
+.btn-primary {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #2563eb;
+}
+
+.btn-danger {
+    background-color: #ef4444;
+    color: white;
+    width: 100%;
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+}
+
+.btn-link {
+    background: none;
+    color: #60a5fa;
+    padding: 4px;
+    width: 100%;
+}
+
+.btn-link:hover {
+    color: #3b82f6;
+}
+
+/* Icon styles */
+.icon {
+    width: 16px;
+    height: 16px;
+}
+
+/* Keyword list */
+.keyword-list {
+    max-height: 192px;
+    overflow-y: auto;
+}
+
+.keyword-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.keyword-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #374151;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.keyword-text {
+    font-size: 14px;
+}
+
+.remove-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.remove-btn:hover {
+    color: #dc2626;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background-color: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: #6b7280;
+}
+
+/* Status message */
+.status-message {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    color: white;
+    font-size: 14px;
+    animation: fadeOut 3s forwards;
+}
+
+.status-success {
+    background-color: #059669;
+}
+
+.status-info {
+    background-color: #3b82f6;
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
+} 

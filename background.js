@@ -15,10 +15,42 @@ function isRootUrl(url) {
     return /^https?\:\/\/[^\/]+\/?$/.test(url);
 }
 
-// Load keywords from chrome.storage.sync
-function loadKeywords(callback) {
-    chrome.storage.sync.get('keywords', (items) => {
-        const keywords = (items.keywords || []).map(keyword => keyword.data);
+// Load default keywords from file
+async function loadDefaultKeywords() {
+    try {
+        const response = await fetch(chrome.runtime.getURL('assets/keyword.txt'));
+        const text = await response.text();
+        return text.split('\n').filter(keyword => keyword.trim().length > 0);
+    } catch (error) {
+        console.error('Error loading default keywords:', error);
+        return [];
+    }
+}
+
+// Get start time based on history range setting
+async function getHistoryStartTime() {
+    const settings = await chrome.storage.sync.get(['historyRange', 'customStartDate']);
+    
+    if (settings.historyRange === 'custom' && settings.customStartDate) {
+        return new Date(settings.customStartDate).getTime();
+    }
+    
+    const days = parseInt(settings.historyRange || '1');
+    return Date.now() - (days * 24 * 60 * 60 * 1000);
+}
+
+// Load all keywords (default + user-defined)
+async function loadAllKeywords(callback) {
+    const defaultKeywords = await loadDefaultKeywords();
+    
+    chrome.storage.sync.get(['keywords', 'defaultKeywordsEnabled'], (items) => {
+        let keywords = (items.keywords || []).map(keyword => keyword.data);
+        
+        // Add default keywords if enabled
+        if (items.defaultKeywordsEnabled !== false) {
+            keywords = [...keywords, ...defaultKeywords];
+        }
+        
         callback(keywords);
     });
 }
@@ -31,31 +63,64 @@ function loadExcludedSites(callback) {
     });
 }
 
-// Clear history entries matching keywords, excluding sites in the excluded list
-function clearMatchingHistory() {
-    loadKeywords(keywords => {
-        loadExcludedSites(excludedSites => {
-            chrome.history.search({ text: '', maxResults: 1000 }, results => {
-                results.forEach(historyItem => {
-                    const domain = extractDomain(historyItem.url);
-                    
-                    // Skip if the domain is in the excludedSites list
-                    if (excludedSites.includes(domain)) {
-                        console.log(`Skipping excluded site: ${domain}`);
-                        return;
-                    }
+// Check if content matches NSFW criteria
+function isNSFWContent(text, keywords) {
+    if (!text) return false;
+    text = text.toLowerCase();
+    return keywords.some(keyword => {
+        const kw = keyword.toLowerCase();
+        // Check for exact word matches using word boundaries
+        const regex = new RegExp(`\\b${kw}\\b`, 'i');
+        return regex.test(text);
+    });
+}
 
-                    keywords.forEach(keyword => {
-                        if (historyItem.url.toLowerCase().includes(keyword.toLowerCase())) {
-                            chrome.history.deleteUrl({ url: historyItem.url }, () => {
-                                if (chrome.runtime.lastError) {
-                                    console.error('Failed to delete URL:', chrome.runtime.lastError);
-                                } else {
-                                    console.log('URL deleted:', historyItem.url);
+// Clear history entries matching keywords, excluding sites in the excluded list
+async function clearMatchingHistory() {
+    const startTime = await getHistoryStartTime();
+    
+    loadAllKeywords(keywords => {
+        loadExcludedSites(excludedSites => {
+            chrome.history.search({ 
+                text: '', 
+                maxResults: 10000,
+                startTime: startTime
+            }, results => {
+                let deletedCount = 0;
+                
+                results.forEach(historyItem => {
+                    try {
+                        const url = new URL(historyItem.url);
+                        const domain = extractDomain(historyItem.url);
+
+                        if (!excludedSites.includes(domain)) {
+                            // Check both URL and title for NSFW content
+                            if (isNSFWContent(historyItem.url, keywords) || 
+                                isNSFWContent(historyItem.title, keywords)) {
+                                
+                                chrome.history.deleteUrl({ url: historyItem.url }, () => {
+                                    if (!chrome.runtime.lastError) {
+                                        deletedCount++;
+                                        console.log('Deleted:', historyItem.url);
+                                    }
+                                });
+
+                                // If root URL is found with NSFW content, clean entire domain
+                                if (isRootUrl(historyItem.url)) {
+                                    chrome.history.search({ 
+                                        text: domain,
+                                        startTime: startTime
+                                    }, domainResults => {
+                                        domainResults.forEach(item => {
+                                            chrome.history.deleteUrl({ url: item.url });
+                                        });
+                                    });
                                 }
-                            });
+                            }
                         }
-                    });
+                    } catch (e) {
+                        console.error('Error processing URL:', historyItem.url, e);
+                    }
                 });
             });
         });

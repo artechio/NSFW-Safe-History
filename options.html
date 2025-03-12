@@ -3,27 +3,84 @@
 <head>
   <meta charset="UTF-8">
   <title>NSFW Safe History Settings</title>
-  <link href="https://unpkg.com/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="assets/style.css" rel="stylesheet">
 </head>
-<body class="p-4">
+<body>
   <div class="container">
-    <h1 class="text-2xl font-bold mb-4">NSFW Safe History Settings</h1>
+    <h1>NSFW Safe History Settings</h1>
 
-    <label class="flex items-center mb-4">
-      <input type="checkbox" id="autoDelete" class="mr-2" />
-      <span>Automatically delete flagged pages from history</span>
-    </label>
+    <!-- History Cleaning Settings -->
+    <div class="section mb-4">
+      <h2>History Cleaning Settings</h2>
+      
+      <div class="mb-4">
+        <label for="historyRange">Clean History From:</label>
+        <select id="historyRange">
+          <option value="1">Last 24 hours</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="custom">Custom date range</option>
+        </select>
+      </div>
 
-    <h2 class="text-xl font-semibold mb-2">Keywords</h2>
-    <input type="file" id="fileInput" class="mb-4" />
-    <ul id="keywordList" class="list-disc pl-5 mb-4"></ul>
+      <div id="customDateContainer" class="mb-4 hidden">
+        <label for="customStartDate">Start Date:</label>
+        <input type="date" id="customStartDate" />
+      </div>
 
-    <div class="flex items-center mb-4">
-      <input type="text" id="newKeyword" placeholder="Add a keyword" class="border p-2 rounded mr-2" />
-      <button id="addKeyword" class="bg-blue-500 text-white p-2 rounded">Add</button>
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="autoDelete" />
+        <label for="autoDelete">Automatically delete flagged pages from history</label>
+      </div>
+    </div>
+
+    <!-- Keywords Management -->
+    <div class="mb-4">
+      <h2>Keywords Management</h2>
+      
+      <!-- Default Keywords Section -->
+      <div class="section mb-4">
+        <div class="flex">
+          <h3>Default Keywords</h3>
+          <div class="checkbox-wrapper">
+            <input type="checkbox" id="useDefaultKeywords" />
+            <label for="useDefaultKeywords">Use default keywords</label>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <textarea id="defaultKeywords" readonly></textarea>
+        </div>
+      </div>
+
+      <!-- Custom Keywords Section -->
+      <div class="section mb-4">
+        <h3>Custom Keywords</h3>
+        
+        <div class="flex mb-4">
+          <input type="text" id="newKeyword" placeholder="Add a keyword" />
+          <button id="addKeyword" class="btn-primary">Add</button>
+        </div>
+
+        <div class="mb-4">
+          <textarea id="customKeywords" placeholder="One keyword per line"></textarea>
+        </div>
+        
+        <div class="flex justify-end space-x-2">
+          <button id="importKeywords" class="btn-secondary">Import</button>
+          <button id="exportKeywords" class="btn-secondary">Export</button>
+          <button id="saveKeywords" class="btn-success">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save Settings Button -->
+    <div class="flex justify-end">
+      <button id="saveSettings" class="btn-primary">Save All Settings</button>
     </div>
   </div>
 
   <script src="options.js"></script>
 </body>
-</html>
+</html> 
