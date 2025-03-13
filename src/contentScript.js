@@ -1,3 +1,10 @@
+// Global settings with defaults
+let settings = {
+    blurIntensity: 20,
+    autoBlur: true,
+    minImageSize: 64
+};
+
 // Process all images on the page
 function processImages() {
     const images = document.getElementsByTagName('img');
@@ -14,8 +21,14 @@ function processImages() {
 function blurImage(img) {
     // Skip small images, already processed images, and invalid images
     if (!img || !img.naturalWidth || !img.naturalHeight || 
-        img.naturalWidth < 64 || img.naturalHeight < 64 || 
+        img.naturalWidth < settings.minImageSize || 
+        img.naturalHeight < settings.minImageSize || 
         img.hasAttribute('data-nsfw-processed')) {
+        return;
+    }
+
+    // Skip if auto-blur is disabled
+    if (!settings.autoBlur) {
         return;
     }
 
@@ -25,21 +38,6 @@ function blurImage(img) {
     // Create warning overlay
     const overlay = document.createElement('div');
     overlay.className = 'nsfw-warning';
-    overlay.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0,0,0,0.7);
-        color: white;
-        font-size: 14px;
-        cursor: pointer;
-        z-index: 10000;
-    `;
     overlay.textContent = 'Click to view image';
     
     // Wrap image in container if not already wrapped
@@ -47,11 +45,6 @@ function blurImage(img) {
     if (!container || !container.classList.contains('nsfw-container')) {
         container = document.createElement('div');
         container.className = 'nsfw-container';
-        container.style.cssText = `
-            position: relative;
-            display: inline-block;
-            max-width: 100%;
-        `;
         if (img.parentNode) {
             img.parentNode.insertBefore(container, img);
             container.appendChild(img);
@@ -59,14 +52,14 @@ function blurImage(img) {
     }
     container.appendChild(overlay);
     
-    // Blur the image
-    img.style.filter = 'blur(20px)';
+    // Apply blur with current intensity
+    img.style.setProperty('--blur-intensity', `${settings.blurIntensity}px`);
     img.title = 'Potentially NSFW content';
     
     // Handle click to reveal
     overlay.addEventListener('click', (e) => {
         e.stopPropagation();
-        img.style.filter = '';
+        img.style.removeProperty('--blur-intensity');
         overlay.remove();
     });
 }
@@ -123,32 +116,37 @@ function setupObserver() {
     return observer;
 }
 
+// Load settings from storage
+function loadSettings(callback) {
+    chrome.storage.sync.get(['blurIntensity', 'autoBlur', 'minImageSize'], (items) => {
+        settings = {
+            blurIntensity: items.blurIntensity || 20,
+            autoBlur: items.autoBlur !== false,
+            minImageSize: items.minImageSize || 64
+        };
+        if (callback) callback();
+    });
+}
+
+// Update all processed images with new settings
+function updateProcessedImages() {
+    const images = document.querySelectorAll('img[data-nsfw-processed]');
+    images.forEach(img => {
+        if (settings.autoBlur) {
+            img.style.setProperty('--blur-intensity', `${settings.blurIntensity}px`);
+        } else {
+            img.style.removeProperty('--blur-intensity');
+            const overlay = img.parentElement?.querySelector('.nsfw-warning');
+            if (overlay) overlay.remove();
+        }
+    });
+}
+
 // Initialize when page loads
 function initialize() {
-    // Process existing images
-    processImages();
-
-    // Set up observer for new images
-    let observer = null;
-    
-    const setupObserverWhenReady = () => {
-        if (document.body) {
-            observer = setupObserver();
-        } else {
-            // If body is not ready, wait and try again
-            setTimeout(setupObserverWhenReady, 100);
-        }
-    };
-
-    setupObserverWhenReady();
-
     // Handle messages from background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === 'ACTIVATE_FILTER') {
-            processImages();
-            if (!observer) {
-                observer = setupObserver();
-            }
             sendResponse({ success: true });
         }
     });

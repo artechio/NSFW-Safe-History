@@ -1,10 +1,10 @@
 document.addEventListener('DOMContentLoaded', async () => {
     // Get DOM elements with error handling
     const elements = {
-        historyRange: document.getElementById('historyRange'),
-        customDateContainer: document.getElementById('customDateContainer'),
-        customStartDate: document.getElementById('customStartDate'),
-        autoDelete: document.getElementById('autoDelete'),
+        cleanInterval: document.getElementById('clean-interval'),
+        customDateContainer: document.getElementById('custom-date-container'),
+        customDate: document.getElementById('custom-date'),
+        autoClean: document.getElementById('auto-clean'),
         useDefaultKeywords: document.getElementById('useDefaultKeywords'),
         defaultKeywords: document.getElementById('defaultKeywords'),
         customKeywords: document.getElementById('customKeywords'),
@@ -39,22 +39,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load saved settings
     async function loadSettings() {
         const settings = await chrome.storage.sync.get([
-            'historyRange',
-            'customStartDate',
-            'autoDelete',
+            'cleanInterval',
+            'customDate',
+            'autoClean',
             'defaultKeywordsEnabled',
             'keywords'
         ]);
 
-        // Set history range
-        elements.historyRange.value = settings.historyRange || '1';
-        if (elements.historyRange.value === 'custom') {
+        // Set clean interval
+        elements.cleanInterval.value = settings.cleanInterval || '1';
+        if (elements.cleanInterval.value === 'custom') {
             elements.customDateContainer.classList.remove('hidden');
-            elements.customStartDate.value = settings.customStartDate || '';
+            elements.customDate.value = settings.customDate || '';
         }
 
-        // Set auto delete
-        elements.autoDelete.checked = settings.autoDelete !== false;
+        // Set auto clean
+        elements.autoClean.checked = settings.autoClean !== false;
 
         // Set default keywords toggle
         elements.useDefaultKeywords.checked = settings.defaultKeywordsEnabled !== false;
@@ -71,9 +71,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Save all settings
     async function saveAllSettings() {
         const settings = {
-            historyRange: elements.historyRange.value,
-            customStartDate: elements.customStartDate.value,
-            autoDelete: elements.autoDelete.checked,
+            cleanInterval: elements.cleanInterval.value,
+            customDate: elements.customDate.value,
+            autoClean: elements.autoClean.checked,
             defaultKeywordsEnabled: elements.useDefaultKeywords.checked,
             keywords: elements.customKeywords.value
                 .split('\n')
@@ -95,15 +95,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     function showStatusMessage(message, color = 'green') {
         const status = document.createElement('div');
         status.textContent = message;
-        status.className = `fixed top-4 right-4 px-4 py-2 rounded shadow text-white bg-${color}-500`;
+        status.className = `status-message status-${color}`;
         document.body.appendChild(status);
         setTimeout(() => status.remove(), 3000);
     }
 
     // Event Listeners
-    elements.historyRange.addEventListener('change', () => {
+    elements.cleanInterval.addEventListener('change', () => {
         elements.customDateContainer.classList.toggle('hidden', 
-            elements.historyRange.value !== 'custom');
+            elements.cleanInterval.value !== 'custom');
     });
 
     elements.importKeywords.addEventListener('click', () => {

@@ -1,5 +1,7 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
+const { DefinePlugin } = require('webpack');
+const packageJson = require('./package.json');
 
 module.exports = {
   mode: 'production',
@@ -33,11 +35,15 @@ module.exports = {
     ]
   },
   plugins: [
+    new DefinePlugin({
+      'VERSION': JSON.stringify(packageJson.version)
+    }),
     new CopyPlugin({
       patterns: [
         { from: 'manifest.json', to: 'manifest.json' },
         { from: 'popup.html', to: 'popup.html' },
         { from: 'options.html', to: 'options.html' },
+        { from: 'content.css', to: 'content.css' },
         { from: 'assets', to: 'assets' }
       ]
     })
