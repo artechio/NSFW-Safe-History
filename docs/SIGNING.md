@@ -1,31 +1,28 @@
-# Extension signing (CRX)
+# Extension signing (optional / advanced)
 
-GitHub Actions can pack a signed **CRX3** file on every `main` release using a stable private key.
+Chrome **does not allow** installing self-signed `.crx` files by drag-and-drop or double-click. You will see:
 
-## Why a private key
+```text
+Package is invalid: 'CRX_REQUIRED_PROOF_MISSING'
+```
 
-Chrome extension IDs are derived from the public key. Reusing the same PEM keeps the ID stable across releases (`bbikojhkfehmocjmpgaipgmlcahipamn` for the key generated with this setup).
+That is Chrome policy since ~v75: only Chrome Web Store packages carry Google’s required proof. A CRX we sign ourselves is valid CRX3, but Chrome still blocks sideload install for normal users.
 
-## Add the GitHub secret
+## What to use instead
 
-1. Open **Settings → Secrets and variables → Actions** in this repo.
-2. Create a secret named `EXTENSION_PRIVATE_KEY`.
-3. Paste the full PEM contents (including `-----BEGIN … KEY-----` / `-----END … KEY-----`).
+**ZIP + Load unpacked** (supported path):
 
-The private key is **not** committed to git (see `*.pem` in `.gitignore`).
+1. Download `nsfw-safe-history-*.zip` from [Releases](https://github.com/artechio/NSFW-Safe-History/releases/latest)
+2. Unzip
+3. `chrome://extensions` → Developer mode → **Load unpacked** → select the folder with `manifest.json`
 
-If you received a generated key from the cloud agent artifacts (`extension-signing-key.pem`), use that exact file so the extension ID stays the same.
+## Optional local CRX pack
 
-## Local pack
+`npm run pack:crx` can still build a CRX3 for enterprise / update-server experiments. It will **not** install via drag-drop in consumer Chrome.
 
 ```bash
 npm run build
-EXTENSION_PRIVATE_KEY="$(cat /path/to/extension.pem)" npm run pack:crx
-# or
 npm run pack:crx -- --key /path/to/extension.pem --crx nsfw-safe-history.crx
 ```
 
-## Notes
-
-- ZIP (Load unpacked) remains the recommended install path for most users.
-- Sideloaded `.crx` files may show `CRX_REQUIRED_PROOF_MISSING` unless Developer mode is enabled; that is a Chrome policy for non–Web Store packages, not a pack failure.
+Keep any private key out of git (`*.pem` is gitignored). Stable IDs need a reused PEM; see `EXTENSION_PRIVATE_KEY` only if you run a private update channel.
