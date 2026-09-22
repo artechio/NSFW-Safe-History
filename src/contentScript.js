@@ -1,160 +1,198 @@
-// Global settings with defaults
-let settings = {
-    blurIntensity: 20,
-    autoBlur: true,
-    minImageSize: 64
-};
+const MIN_IMAGE_SIZE = 64;
+const elementsByUrl = new Map();
+const queued = new Set();
+const decided = new Map();
+let settings = null;
+let flushTimer = null;
+const pending = [];
 
-// Process all images on the page
-function processImages() {
-    const images = document.getElementsByTagName('img');
-    for (const img of images) {
-        if (img.complete) {
-            blurImage(img);
-        } else {
-            img.addEventListener('load', () => blurImage(img));
-        }
-    }
-}
-
-// Blur an image and add warning overlay
-function blurImage(img) {
-    // Skip small images, already processed images, and invalid images
-    if (!img || !img.naturalWidth || !img.naturalHeight || 
-        img.naturalWidth < settings.minImageSize || 
-        img.naturalHeight < settings.minImageSize || 
-        img.hasAttribute('data-nsfw-processed')) {
-        return;
-    }
-
-    // Skip if auto-blur is disabled
-    if (!settings.autoBlur) {
-        return;
-    }
-
-    // Mark as processed
-    img.setAttribute('data-nsfw-processed', 'true');
-
-    // Create warning overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'nsfw-warning';
-    overlay.textContent = 'Click to view image';
-    
-    // Wrap image in container if not already wrapped
-    let container = img.parentElement;
-    if (!container || !container.classList.contains('nsfw-container')) {
-        container = document.createElement('div');
-        container.className = 'nsfw-container';
-        if (img.parentNode) {
-            img.parentNode.insertBefore(container, img);
-            container.appendChild(img);
-        }
-    }
-    container.appendChild(overlay);
-    
-    // Apply blur with current intensity
-    img.style.setProperty('--blur-intensity', `${settings.blurIntensity}px`);
-    img.title = 'Potentially NSFW content';
-    
-    // Handle click to reveal
-    overlay.addEventListener('click', (e) => {
-        e.stopPropagation();
-        img.style.removeProperty('--blur-intensity');
-        overlay.remove();
+function sendMessage(message) {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(message, response => {
+            const err = chrome.runtime.lastError;
+            if (err) reject(new Error(err.message));
+            else resolve(response);
+        });
     });
 }
 
-// Check if URL is in blocklist
-function checkIfBlocked(callback) {
-    chrome.storage.sync.get(['excludedSites'], (items) => {
-        const excludedSites = items.excludedSites || [];
-        const currentDomain = window.location.hostname;
-        callback(!excludedSites.includes(currentDomain));
+function imageUrl(element) {
+    if (element.tagName === 'IMG') return element.currentSrc || element.src || '';
+    if (element.tagName === 'VIDEO') return element.poster || '';
+    return '';
+}
+
+function isClassifiable(url) {
+    return /^https?:/i.test(url);
+}
+
+function applyBlur(element) {
+    if (!element || element.dataset.nsfwRevealed === '1' || element.classList.contains('nsfw-blur')) return;
+    element.classList.add('nsfw-blur');
+    element.title = 'Potentially NSFW image. Click to reveal.';
+    element.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        element.classList.remove('nsfw-blur');
+        element.dataset.nsfwRevealed = '1';
+    }, { once: true });
+}
+
+function clearBlur(element) {
+    element.classList.remove('nsfw-blur');
+}
+
+function remember(url, element) {
+    if (!elementsByUrl.has(url)) elementsByUrl.set(url, new Set());
+    elementsByUrl.get(url).add(element);
+}
+
+function paint(url, nsfw) {
+    decided.set(url, nsfw);
+    const elements = elementsByUrl.get(url);
+    if (!elements) return;
+    elements.forEach(element => {
+        if (nsfw) applyBlur(element);
+        else clearBlur(element);
     });
 }
 
-// Process new images added dynamically
-function setupObserver() {
-    // Make sure we have a valid document and body
-    if (!document || !document.body) {
-        console.warn('Document or body not ready for observer');
-        return;
-    }
-
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            // Handle added nodes
-            mutation.addedNodes.forEach((node) => {
-                if (node.nodeName === 'IMG') {
-                    blurImage(node);
-                } else if (node.getElementsByTagName) {
-                    const images = node.getElementsByTagName('img');
-                    Array.from(images).forEach(img => blurImage(img));
-                }
+function scheduleFlush() {
+    if (flushTimer) return;
+    flushTimer = setTimeout(() => {
+        flushTimer = null;
+        const urls = pending.splice(0, 12);
+        if (!urls.length) return;
+        sendMessage({ action: 'CLASSIFY_URLS', urls })
+            .then(response => {
+                const results = response && response.results ? response.results : [];
+                const seen = new Set();
+                results.forEach(result => {
+                    seen.add(result.url);
+                    queued.delete(result.url);
+                    paint(result.url, Boolean(result.nsfw));
+                });
+                urls.forEach(url => {
+                    if (!seen.has(url)) {
+                        queued.delete(url);
+                        paint(url, false);
+                    }
+                });
+            })
+            .catch(() => {
+                urls.forEach(url => queued.delete(url));
             });
+        if (pending.length) scheduleFlush();
+    }, 300);
+}
 
-            // Handle attribute changes on images
-            if (mutation.type === 'attributes' && 
-                mutation.target.nodeName === 'IMG' &&
-                !mutation.target.hasAttribute('data-nsfw-processed')) {
-                blurImage(mutation.target);
+function enqueue(element) {
+    if (!settings || !settings.enabled || !settings.blurEnabled) return;
+    if (settings.excludedSites.includes(location.hostname)) return;
+
+    const url = imageUrl(element);
+    if (!isClassifiable(url)) return;
+    remember(url, element);
+
+    if (decided.has(url)) {
+        if (decided.get(url)) applyBlur(element);
+        return;
+    }
+    if (queued.has(url)) return;
+    queued.add(url);
+    pending.push(url);
+    scheduleFlush();
+}
+
+function readyToScan(element) {
+    if (element.tagName === 'IMG') {
+        if (!element.complete) {
+            element.addEventListener('load', () => consider(element), { once: true });
+            return false;
+        }
+        if (element.naturalWidth < MIN_IMAGE_SIZE || element.naturalHeight < MIN_IMAGE_SIZE) return false;
+    }
+    if (element.tagName === 'VIDEO' && !element.poster) return false;
+    return true;
+}
+
+function consider(element) {
+    if (!element || element.dataset.nsfwWatch === '1') return;
+    if (!readyToScan(element)) return;
+    element.dataset.nsfwWatch = '1';
+    observer.observe(element);
+}
+
+const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) enqueue(entry.target);
+    });
+}, { rootMargin: '200px' });
+
+function scan(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('img, video').forEach(consider);
+    if (root && (root.tagName === 'IMG' || root.tagName === 'VIDEO')) consider(root);
+}
+
+function syncAppearance() {
+    document.documentElement.style.setProperty('--blur-intensity', `${settings.blurIntensity}px`);
+    if (!settings.enabled || !settings.blurEnabled || settings.excludedSites.includes(location.hostname)) {
+        document.querySelectorAll('.nsfw-blur').forEach(clearBlur);
+    }
+}
+
+function filteringActive() {
+    return Boolean(settings && settings.enabled && settings.blurEnabled && !settings.excludedSites.includes(location.hostname));
+}
+
+function rescan() {
+    document.querySelectorAll('img, video').forEach(element => {
+        delete element.dataset.nsfwWatch;
+    });
+    if (filteringActive()) scan(document);
+}
+
+function watchDom() {
+    new MutationObserver(mutations => {
+        if (!filteringActive()) return;
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === 1) scan(node);
+            });
+            if (mutation.type === 'attributes' && mutation.target && mutation.target.dataset) {
+                delete mutation.target.dataset.nsfwWatch;
+                consider(mutation.target);
             }
         });
-    });
-
-    try {
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['src']
-        });
-    } catch (error) {
-        console.error('Error setting up observer:', error);
-    }
-
-    return observer;
-}
-
-// Load settings from storage
-function loadSettings(callback) {
-    chrome.storage.sync.get(['blurIntensity', 'autoBlur', 'minImageSize'], (items) => {
-        settings = {
-            blurIntensity: items.blurIntensity || 20,
-            autoBlur: items.autoBlur !== false,
-            minImageSize: items.minImageSize || 64
-        };
-        if (callback) callback();
+    }).observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['src', 'poster']
     });
 }
 
-// Update all processed images with new settings
-function updateProcessedImages() {
-    const images = document.querySelectorAll('img[data-nsfw-processed]');
-    images.forEach(img => {
-        if (settings.autoBlur) {
-            img.style.setProperty('--blur-intensity', `${settings.blurIntensity}px`);
-        } else {
-            img.style.removeProperty('--blur-intensity');
-            const overlay = img.parentElement?.querySelector('.nsfw-warning');
-            if (overlay) overlay.remove();
-        }
+function start() {
+    sendMessage({ action: 'GET_SETTINGS' }).then(response => {
+        if (!response || response.error) return;
+        settings = response;
+        syncAppearance();
+        watchDom();
+        rescan();
+    }).catch(() => {});
+
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'sync') return;
+        sendMessage({ action: 'GET_SETTINGS' }).then(response => {
+            if (!response || response.error) return;
+            settings = response;
+            syncAppearance();
+            rescan();
+        }).catch(() => {});
     });
 }
 
-// Initialize when page loads
-function initialize() {
-    // Handle messages from background script
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.action === 'ACTIVATE_FILTER') {
-            sendResponse({ success: true });
-        }
-    });
-}
-
-// Start initialization
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialize);
-} else {
-    initialize();
+if (location.protocol === 'http:' || location.protocol === 'https:') {
+    start();
 }

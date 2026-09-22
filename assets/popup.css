@@ -246,6 +246,10 @@ body {
     background-color: #3b82f6;
 }
 
+.status-error {
+    background-color: #dc2626;
+}
+
 @keyframes fadeOut {
     0% { opacity: 1; }
     70% { opacity: 1; }

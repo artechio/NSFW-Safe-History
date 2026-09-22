@@ -1,109 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>NSFW Safe History Settings</title>
-  <link href="assets/style.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>NSFW Safe History Settings</title>
+    <link href="assets/style.css" rel="stylesheet">
 </head>
 <body>
-  <div class="container">
-    <h1>NSFW Safe History Settings</h1>
+    <div class="container">
+        <h1>NSFW Safe History</h1>
+        <p id="status" class="status hidden" role="status"></p>
 
-    <section class="section">
-      <h2>Filter Categories</h2>
-      <div class="filter-categories">
-        <div class="filter-item">
-          <input type="checkbox" id="adult-content" checked>
-          <label for="adult-content">Adult Content</label>
-        </div>
-        <div class="filter-item">
-          <input type="checkbox" id="social-media">
-          <label for="social-media">Social Media</label>
-        </div>
-        <div class="filter-item">
-          <input type="checkbox" id="gambling">
-          <label for="gambling">Gambling</label>
-        </div>
-        <div class="filter-item">
-          <input type="checkbox" id="violence">
-          <label for="violence">Violence</label>
-        </div>
-      </div>
-    </section>
+        <section class="section">
+            <h2>Protection</h2>
+            <div class="checkbox-wrapper">
+                <input type="checkbox" id="enabled">
+                <label for="enabled">Enable protection</label>
+            </div>
+            <div class="checkbox-wrapper">
+                <input type="checkbox" id="autoDeleteHistory">
+                <label for="autoDeleteHistory">Delete matching history as soon as a page is visited</label>
+            </div>
+            <div class="checkbox-wrapper">
+                <input type="checkbox" id="blurEnabled">
+                <label for="blurEnabled">Blur images the on-device model marks as adult</label>
+            </div>
+            <label for="blurIntensity">Blur strength (px)</label>
+            <input type="number" id="blurIntensity" min="5" max="40" step="1">
+            <label for="nsfwThreshold">Detection threshold (0.50–0.95)</label>
+            <input type="number" id="nsfwThreshold" min="0.5" max="0.95" step="0.05">
+            <label for="historyLookbackDays">Manual clean covers</label>
+            <select id="historyLookbackDays">
+                <option value="1">1 day</option>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+            </select>
+        </section>
 
-    <section class="section">
-      <h2>History Management</h2>
-      <div class="history-settings">
-        <div class="setting-item">
-          <input type="checkbox" id="auto-clean" checked>
-          <label for="auto-clean">Automatically clean history</label>
-        </div>
-        <div class="setting-item">
-          <label for="clean-interval">Clean history every:</label>
-          <select id="clean-interval">
-            <option value="1">1 day</option>
-            <option value="7">7 days</option>
-            <option value="30">30 days</option>
-            <option value="custom">Custom date</option>
-          </select>
-        </div>
-        <div class="setting-item" id="custom-date-container" style="display: none;">
-          <label for="custom-date">Start from:</label>
-          <input type="date" id="custom-date">
-        </div>
-      </div>
-    </section>
+        <section class="section">
+            <h2>Custom domains</h2>
+            <p>One domain per line. Visits to these domains are removed from history.</p>
+            <textarea id="customDomains" spellcheck="false"></textarea>
+        </section>
 
-    <section class="section">
-      <h2>Never Save History</h2>
-      <div class="never-save-settings">
-        <div class="setting-item">
-          <input type="text" id="never-save-url" placeholder="Enter URL or domain">
-          <button id="add-never-save">Add</button>
-        </div>
-        <div class="never-save-list" id="never-save-list">
-          <!-- Never save URLs will be added here -->
-        </div>
-      </div>
-    </section>
+        <section class="section">
+            <h2>Excluded sites</h2>
+            <p>One hostname per line. These sites are left unchanged.</p>
+            <textarea id="excludedSites" spellcheck="false"></textarea>
+        </section>
 
-    <section class="section">
-      <h2>Filter Lists</h2>
-      <div class="filter-lists">
-        <div class="filter-source">
-          <h3>Adult Content</h3>
-          <select id="adult-list-source">
-            <option value="1hosts">1Hosts (Lite)</option>
-            <option value="energized">Energized Basic</option>
-            <option value="stevenblack">Steven Black</option>
-          </select>
-        </div>
-        <div class="filter-source">
-          <h3>Social Media</h3>
-          <select id="social-list-source">
-            <option value="1hosts">1Hosts (Social)</option>
-            <option value="energized">Energized Social</option>
-            <option value="stevenblack">Steven Black Social</option>
-          </select>
-        </div>
-        <div class="update-settings">
-          <label for="auto-update">Auto-update filter lists:</label>
-          <select id="auto-update">
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="never">Never</option>
-          </select>
-        </div>
-      </div>
-    </section>
+        <section class="section">
+            <h2>Domain list</h2>
+            <p id="blocklistMeta">The built-in adult-domain list updates weekly.</p>
+            <button id="updateBlocklist" class="btn-secondary" type="button">Update domain list now</button>
+        </section>
 
-    <div class="actions">
-      <button id="save">Save Settings</button>
-      <button id="reset">Reset to Default</button>
+        <div class="actions flex space-x-2">
+            <button id="save" class="btn-primary" type="button">Save settings</button>
+        </div>
     </div>
-  </div>
-
-  <script src="options.js"></script>
+    <script src="options.js"></script>
 </body>
-</html> 
+</html>
