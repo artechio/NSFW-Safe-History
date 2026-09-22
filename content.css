@@ -1,5 +1,11 @@
 img.nsfw-blur,
-video.nsfw-blur {
+video.nsfw-blur,
+iframe.nsfw-blur,
+a.nsfw-blur,
+div.nsfw-blur,
+span.nsfw-blur,
+section.nsfw-blur,
+aside.nsfw-blur {
     filter: blur(var(--blur-intensity, 20px)) !important;
     cursor: pointer;
     transition: filter 0.2s ease;
