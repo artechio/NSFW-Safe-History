@@ -12,10 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
     versionBadge.textContent = `v${chrome.runtime.getManifest().version}`;
 
     const rangeLabels = {
-        today: 'پاک‌کردن امروز',
-        week: 'پاک‌کردن این هفته',
-        month: 'پاک‌کردن این ماه',
-        all: 'پاک‌کردن کل تاریخچه'
+        today: 'Clear today',
+        week: 'Clear this week',
+        month: 'Clear this month',
+        all: 'Clear all history'
     };
 
     function sendMessage(message) {
@@ -38,8 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setExcludeLabel(active) {
         excludeToggleLabel.textContent = active
-            ? 'پاک‌کردن هیستوری و بلور برای این سایت فعال است'
-            : 'این سایت مستثنی شده است';
+            ? 'History cleaning and blur are on for this site'
+            : 'This site is excluded';
     }
 
     function setSelectedRange(range) {
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
             button.classList.toggle('is-selected', button.dataset.range === range);
         });
         clearHistory.disabled = false;
-        clearHistory.querySelector('span').textContent = rangeLabels[range] || 'پاک‌کردن بازه انتخاب‌شده';
+        clearHistory.querySelector('span').textContent = rangeLabels[range] || 'Clear selected range';
     }
 
     function setBusy(busy) {
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             excludeToggle.checked = !excluded;
             setExcludeLabel(!excluded);
         });
-    }).catch(() => showStatus('بارگذاری تنظیمات ممکن نبود', 'error'));
+    }).catch(() => showStatus('Could not load settings', 'error'));
 
     rangeButtons.forEach(button => {
         button.addEventListener('click', () => setSelectedRange(button.dataset.range));
@@ -97,32 +97,32 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }).then(() => {
             setExcludeLabel(excludeToggle.checked);
-        }).catch(() => showStatus('به‌روزرسانی این سایت ممکن نبود', 'error'));
+        }).catch(() => showStatus('Could not update this site', 'error'));
     });
 
     blurToggle.addEventListener('change', () => {
         sendMessage({
             action: 'UPDATE_SETTINGS',
             settings: { blurEnabled: blurToggle.checked }
-        }).catch(() => showStatus('به‌روزرسانی بلور ممکن نبود', 'error'));
+        }).catch(() => showStatus('Could not update blur', 'error'));
     });
 
     clearHistory.addEventListener('click', () => {
         if (!selectedRange) return;
         if (selectedRange === 'all') {
-            const ok = window.confirm('کل هیستوری منطبق پاک شود؟ این کار قابل بازگشت نیست.');
+            const ok = window.confirm('Clear all matching history? This cannot be undone.');
             if (!ok) return;
         }
 
         setBusy(true);
-        clearHistory.querySelector('span').textContent = 'در حال پاک‌کردن…';
+        clearHistory.querySelector('span').textContent = 'Clearing…';
         sendMessage({ action: 'CLEAR_HISTORY', range: selectedRange }).then(response => {
             if (!response || !response.ok) {
-                showStatus('پاک‌کردن هیستوری ممکن نبود', 'error');
+                showStatus('Could not clean history', 'error');
                 return;
             }
-            showStatus(`${response.deleted} مورد پاک شد`, 'success');
-        }).catch(() => showStatus('پاک‌کردن هیستوری ممکن نبود', 'error'))
+            showStatus(`Removed ${response.deleted} history entries`, 'success');
+        }).catch(() => showStatus('Could not clean history', 'error'))
             .finally(() => {
                 setBusy(false);
                 setSelectedRange(selectedRange);
