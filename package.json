@@ -1,7 +1,7 @@
 {
   "name": "nsfw-safe-history",
-  "version": "2.0.6",
-  "description": "A Chrome extension to protect your browsing history from NSFW content",
+  "version": "2.0.7",
+  "description": "Chrome extension: clear adult sites from history on visit and blur NSFW images on-device",
   "main": "src/background.js",
   "scripts": {
     "build": "webpack --mode production && npm run build --prefix ext-ui",

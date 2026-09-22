@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "NSFW Safe History",
-    "version": "2.0.6",
-    "description": "Remove adult sites from history immediately and blur images classified on your device",
+    "version": "2.0.7",
+    "description": "Clear adult sites from Chrome history on visit and blur NSFW images on-device — no upload",
     "permissions": [
         "storage",
         "history",
