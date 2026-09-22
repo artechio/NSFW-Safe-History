@@ -10,6 +10,7 @@ Classification runs in the browser. Image bytes are not uploaded. The only netwo
 - Deletes that URL from Chrome history in `history.onVisited`, and again when the on-device model flags an image on the page.
 - Blurs only images whose `Porn` or `Hentai` score is at or above the threshold. A high `Sexy` score alone does not blur.
 - Leaves excluded hostnames untouched.
+- Leaves captcha widgets and captcha provider frames (reCAPTCHA, hCaptcha, Turnstile, etc.) unblurred so challenges stay usable.
 - Does not scan page text, and does not delete every history entry for a domain.
 - Classifies video posters only, not every video frame. Text-only pages that are not on the domain list stay in history.
 
