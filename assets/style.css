@@ -111,6 +111,7 @@ h3 {
 
 /* Form elements */
 input[type="text"],
+input[type="number"],
 input[type="date"],
 select,
 textarea {

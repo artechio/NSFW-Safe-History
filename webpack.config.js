@@ -1,10 +1,9 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
-const { DefinePlugin } = require('webpack');
-const packageJson = require('./package.json');
 
 module.exports = {
   mode: 'production',
+  devtool: false,
   entry: {
     background: './src/background.js',
     popup: './src/popup.js',
@@ -16,36 +15,22 @@ module.exports = {
     filename: '[name].js',
     clean: true
   },
-  module: {
-    rules: [
-      {
-        test: /\.js$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env']
-          }
-        }
-      },
-      {
-        test: /\.css$/,
-        use: ['style-loader', 'css-loader']
-      }
-    ]
+  optimization: {
+    splitChunks: false,
+    runtimeChunk: false
   },
   plugins: [
-    new DefinePlugin({
-      'VERSION': JSON.stringify(packageJson.version)
-    }),
     new CopyPlugin({
       patterns: [
         { from: 'manifest.json', to: 'manifest.json' },
         { from: 'popup.html', to: 'popup.html' },
         { from: 'options.html', to: 'options.html' },
+        { from: 'offscreen.html', to: 'offscreen.html' },
+        { from: 'src/offscreen.js', to: 'offscreen.js' },
         { from: 'content.css', to: 'content.css' },
-        { from: 'assets', to: 'assets' }
+        { from: 'assets', to: 'assets' },
+        { from: 'node_modules/nsfwjs/dist/nsfwjs.min.js', to: 'assets/vendor/nsfwjs.min.js' }
       ]
     })
   ]
-}; 
+};
