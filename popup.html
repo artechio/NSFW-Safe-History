@@ -32,9 +32,17 @@
         <p class="toggle-status">Only images the on-device model marks as adult are blurred.</p>
     </div>
 
-    <div class="section">
-        <button id="clearHistory" class="btn btn-danger" type="button">
-            <span>Clear matching history</span>
+    <div class="section" id="clearSection">
+        <p class="toggle-label">Clear matching history</p>
+        <p class="toggle-status">Which period should be cleaned?</p>
+        <div class="range-grid" role="group" aria-label="History range">
+            <button type="button" class="btn btn-range" data-range="today">Today</button>
+            <button type="button" class="btn btn-range" data-range="week">This week</button>
+            <button type="button" class="btn btn-range" data-range="month">This month</button>
+            <button type="button" class="btn btn-range" data-range="all">All history</button>
+        </div>
+        <button id="clearHistory" class="btn btn-danger" type="button" disabled>
+            <span>Clear selected range</span>
         </button>
     </div>
 

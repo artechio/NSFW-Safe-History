@@ -9,10 +9,15 @@ const DEFAULT_SETTINGS = {
     excludedSites: [],
     customDomains: [],
     lastBlocklistUpdate: 0,
-    historyLookbackDays: 7
+    lastCleanRange: 'week'
 };
 
-const LOOKBACK_DAYS = new Set([1, 7, 30]);
+const CLEAN_RANGES = {
+    today: 1,
+    week: 7,
+    month: 30,
+    all: 0
+};
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -32,11 +37,15 @@ function uniqueDomains(values) {
     return domains;
 }
 
+function normalizeCleanRange(value) {
+    if (CLEAN_RANGES[value] !== undefined) return value;
+    return DEFAULT_SETTINGS.lastCleanRange;
+}
+
 function normalizeSettings(raw) {
     const source = raw || {};
     const blurIntensity = Number(source.blurIntensity);
     const nsfwThreshold = Number(source.nsfwThreshold);
-    const lookback = Number(source.historyLookbackDays);
 
     return {
         enabled: source.enabled !== false,
@@ -47,11 +56,26 @@ function normalizeSettings(raw) {
         excludedSites: uniqueDomains(source.excludedSites),
         customDomains: uniqueDomains(source.customDomains),
         lastBlocklistUpdate: Number(source.lastBlocklistUpdate) || 0,
-        historyLookbackDays: LOOKBACK_DAYS.has(lookback) ? lookback : DEFAULT_SETTINGS.historyLookbackDays
+        lastCleanRange: normalizeCleanRange(source.lastCleanRange)
     };
+}
+
+function historyStartTime(range) {
+    const key = normalizeCleanRange(range);
+    const days = CLEAN_RANGES[key];
+    if (!days) return 0;
+    if (key === 'today') {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        return start.getTime();
+    }
+    return Date.now() - days * 24 * 60 * 60 * 1000;
 }
 
 module.exports = {
     DEFAULT_SETTINGS,
-    normalizeSettings
+    CLEAN_RANGES,
+    normalizeSettings,
+    normalizeCleanRange,
+    historyStartTime
 };
