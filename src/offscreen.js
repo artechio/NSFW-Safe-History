@@ -2,8 +2,8 @@ let modelPromise = null;
 
 function getModel() {
     if (!modelPromise) {
-        const modelUrl = chrome.runtime.getURL('assets/model/model.json');
-        modelPromise = nsfwjs.load(modelUrl).catch(error => {
+        const modelUrl = chrome.runtime.getURL('assets/model/');
+        modelPromise = nsfwjs.load(modelUrl, { size: 224 }).catch(error => {
             modelPromise = null;
             throw error;
         });
@@ -11,22 +11,37 @@ function getModel() {
     return modelPromise;
 }
 
-async function classifyUrl(url) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Image fetch failed');
-    const blob = await response.blob();
-    if (!blob.type.startsWith('image/')) throw new Error('Response is not an image');
+async function loadImageElement(url) {
+    if (url.startsWith('data:image/')) {
+        const image = new Image();
+        await new Promise((resolve, reject) => {
+            image.onload = resolve;
+            image.onerror = () => reject(new Error('Data image failed to load'));
+            image.src = url;
+        });
+        return image;
+    }
 
-    const bitmap = await createImageBitmap(blob);
+    const response = await fetch(url, { credentials: 'omit', cache: 'force-cache' });
+    if (!response.ok) throw new Error(`Image fetch failed (${response.status})`);
+    const blob = await response.blob();
+    if (blob.type && !blob.type.startsWith('image/') && blob.type !== 'application/octet-stream') {
+        throw new Error(`Response is not an image (${blob.type || 'unknown'})`);
+    }
+    return createImageBitmap(blob);
+}
+
+async function classifyUrl(url) {
+    const source = await loadImageElement(url);
     const canvas = document.createElement('canvas');
     canvas.width = 224;
     canvas.height = 224;
     const context = canvas.getContext('2d', { willReadFrequently: true });
-    context.drawImage(bitmap, 0, 0, 224, 224);
-    bitmap.close();
+    context.drawImage(source, 0, 0, 224, 224);
+    if (typeof source.close === 'function') source.close();
 
     const model = await getModel();
-    return model.classify(canvas);
+    return model.classify(canvas, 5);
 }
 
 const port = chrome.runtime.connect({ name: 'classifier' });
