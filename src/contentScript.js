@@ -1,3 +1,5 @@
+const { hostLooksLikeCaptcha, urlLooksLikeCaptcha, elementLooksLikeCaptcha } = require('./lib/captcha');
+
 const MIN_IMAGE_SIZE = 64;
 const MIN_AD_SIZE = 40;
 const elementsByUrl = new Map();
@@ -5,6 +7,7 @@ const queued = new Set();
 const decided = new Map();
 let settings = null;
 let siteListed = false;
+let captchaFrame = false;
 let flushTimer = null;
 const pending = [];
 
@@ -64,8 +67,19 @@ function elementSizeOk(element, minimum) {
     return width >= minimum && height >= minimum;
 }
 
+function shouldSkipBlur(element) {
+    if (captchaFrame) return true;
+    if (!element) return true;
+    if (elementLooksLikeCaptcha(element)) return true;
+    if (element.tagName === 'IFRAME' || element.tagName === 'IMG' || element.tagName === 'VIDEO') {
+        if (urlLooksLikeCaptcha(element.src || element.currentSrc || '')) return true;
+    }
+    return false;
+}
+
 function applyBlur(element) {
-    if (!element || element.dataset.nsfwRevealed === '1' || element.classList.contains('nsfw-blur')) return;
+    if (!element || shouldSkipBlur(element)) return;
+    if (element.dataset.nsfwRevealed === '1' || element.classList.contains('nsfw-blur')) return;
     element.classList.add('nsfw-blur');
     element.title = 'Potentially NSFW media. Click to reveal.';
     element.addEventListener('click', event => {
@@ -127,6 +141,7 @@ function scheduleFlush() {
 
 function enqueue(element) {
     if (!filteringActive()) return;
+    if (shouldSkipBlur(element)) return;
 
     if (siteListed) {
         applyBlur(element);
@@ -138,6 +153,7 @@ function enqueue(element) {
         if (element.tagName === 'VIDEO' || element.tagName === 'IFRAME') applyBlur(element);
         return;
     }
+    if (urlLooksLikeCaptcha(url)) return;
     remember(url, element);
 
     if (decided.has(url)) {
@@ -179,6 +195,7 @@ function readyToScan(element) {
 
 function consider(element) {
     if (!element || element.dataset.nsfwWatch === '1') return;
+    if (shouldSkipBlur(element)) return;
     if (!readyToScan(element)) return;
     element.dataset.nsfwWatch = '1';
     observer.observe(element);
@@ -208,6 +225,7 @@ function syncAppearance() {
 }
 
 function filteringActive() {
+    if (captchaFrame || hostLooksLikeCaptcha(location.hostname)) return false;
     return Boolean(settings && settings.enabled && settings.blurEnabled && !(settings.excludedSites || []).includes(location.hostname));
 }
 
@@ -241,25 +259,30 @@ function watchDom() {
     });
 }
 
+function applySiteStatus(response) {
+    if (!response || response.error) return;
+    settings = response;
+    captchaFrame = Boolean(response.captchaFrame) || hostLooksLikeCaptcha(location.hostname);
+    siteListed = Boolean(response.listed) && !captchaFrame;
+    syncAppearance();
+    if (captchaFrame) {
+        document.querySelectorAll('.nsfw-blur').forEach(clearBlur);
+        return;
+    }
+    rescan();
+}
+
 function start() {
     sendMessage({ action: 'GET_SITE_STATUS', hostname: location.hostname }).then(response => {
-        if (!response || response.error) return;
-        settings = response;
-        siteListed = Boolean(response.listed);
-        syncAppearance();
+        applySiteStatus(response);
         watchDom();
-        rescan();
     }).catch(() => {});
 
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'sync') return;
-        sendMessage({ action: 'GET_SITE_STATUS', hostname: location.hostname }).then(response => {
-            if (!response || response.error) return;
-            settings = response;
-            siteListed = Boolean(response.listed);
-            syncAppearance();
-            rescan();
-        }).catch(() => {});
+        sendMessage({ action: 'GET_SITE_STATUS', hostname: location.hostname })
+            .then(applySiteStatus)
+            .catch(() => {});
     });
 }
 

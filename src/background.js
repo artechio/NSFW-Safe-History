@@ -3,6 +3,7 @@ const { normalizeSettings, historyStartTime, normalizeCleanRange } = require('./
 const { isNsfwPrediction } = require('./lib/scores');
 const { readDomains, writeDomains } = require('./lib/blocklistDb');
 const { titleOrUrlLooksAdult } = require('./lib/historyMatch');
+const { hostLooksLikeCaptcha, urlLooksLikeCaptcha } = require('./lib/captcha');
 
 const MAX_CONCURRENT = 2;
 const CLASSIFY_TIMEOUT_MS = 25000;
@@ -241,12 +242,22 @@ async function classifyForTab(urls, sender) {
     }
 
     if (siteIsProtected(hostname, settings)) {
-        return { results: list.map(url => ({ url, nsfw: true })), listed: true };
+        return {
+            results: list.map(url => ({
+                url,
+                nsfw: !urlLooksLikeCaptcha(url)
+            })),
+            listed: true
+        };
     }
 
     const results = [];
     let anyNsfw = false;
     for (const url of list) {
+        if (urlLooksLikeCaptcha(url)) {
+            results.push({ url, nsfw: false });
+            continue;
+        }
         const nsfw = await classifyCached(url, settings.nsfwThreshold);
         if (nsfw) anyNsfw = true;
         results.push({ url, nsfw });
@@ -342,10 +353,12 @@ async function getSiteStatus(frameHostname, tabHostname) {
     const settings = await getSettings();
     const frameHost = String(frameHostname || '').toLowerCase();
     const tabHost = String(tabHostname || '').toLowerCase();
-    const listed = siteIsProtected(tabHost, settings) || siteIsProtected(frameHost, settings);
+    const captchaFrame = hostLooksLikeCaptcha(frameHost);
+    const listed = !captchaFrame && (siteIsProtected(tabHost, settings) || siteIsProtected(frameHost, settings));
     return {
         ...settings,
         listed,
+        captchaFrame,
         hostname: frameHost,
         tabHostname: tabHost
     };
