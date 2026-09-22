@@ -337,14 +337,17 @@ async function clearMatchingHistory(range) {
     return deleted;
 }
 
-async function getSiteStatus(hostname) {
+async function getSiteStatus(frameHostname, tabHostname) {
     await bootBlocklist();
     const settings = await getSettings();
-    const host = String(hostname || '').toLowerCase();
+    const frameHost = String(frameHostname || '').toLowerCase();
+    const tabHost = String(tabHostname || '').toLowerCase();
+    const listed = siteIsProtected(tabHost, settings) || siteIsProtected(frameHost, settings);
     return {
         ...settings,
-        listed: siteIsProtected(host, settings),
-        hostname: host
+        listed,
+        hostname: frameHost,
+        tabHostname: tabHost
     };
 }
 
@@ -382,8 +385,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.action === 'GET_SITE_STATUS') {
-        const hostname = message.hostname || (sender.tab && hostnameOf(sender.tab.url));
-        getSiteStatus(hostname).then(sendResponse).catch(error => sendResponse({ error: error.message }));
+        const tabHostname = sender.tab && hostnameOf(sender.tab.url);
+        const frameHostname = message.hostname || tabHostname;
+        getSiteStatus(frameHostname, tabHostname)
+            .then(sendResponse)
+            .catch(error => sendResponse({ error: error.message }));
         return true;
     }
 

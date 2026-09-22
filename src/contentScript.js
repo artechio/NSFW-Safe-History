@@ -1,4 +1,5 @@
 const MIN_IMAGE_SIZE = 64;
+const MIN_AD_SIZE = 40;
 const elementsByUrl = new Map();
 const queued = new Set();
 const decided = new Map();
@@ -25,7 +26,17 @@ function imageUrl(element) {
         if (element.poster) return element.poster;
         return captureVideoFrame(element);
     }
-    return '';
+    return backgroundImageUrl(element);
+}
+
+function backgroundImageUrl(element) {
+    try {
+        const background = getComputedStyle(element).backgroundImage || '';
+        const match = background.match(/url\(["']?(https?:[^"')]+)["']?\)/i);
+        return match ? match[1] : '';
+    } catch (error) {
+        return '';
+    }
 }
 
 function captureVideoFrame(video) {
@@ -45,6 +56,12 @@ function captureVideoFrame(video) {
 
 function isClassifiable(url) {
     return /^https?:/i.test(url) || (typeof url === 'string' && url.startsWith('data:image/'));
+}
+
+function elementSizeOk(element, minimum) {
+    const width = element.clientWidth || element.offsetWidth || element.naturalWidth || 0;
+    const height = element.clientHeight || element.offsetHeight || element.naturalHeight || 0;
+    return width >= minimum && height >= minimum;
 }
 
 function applyBlur(element) {
@@ -118,7 +135,7 @@ function enqueue(element) {
 
     const url = imageUrl(element);
     if (!isClassifiable(url)) {
-        if (element.tagName === 'VIDEO') applyBlur(element);
+        if (element.tagName === 'VIDEO' || element.tagName === 'IFRAME') applyBlur(element);
         return;
     }
     remember(url, element);
@@ -134,7 +151,8 @@ function enqueue(element) {
 }
 
 function readyToScan(element) {
-    if (element.tagName === 'IMG') {
+    const tag = element.tagName;
+    if (tag === 'IMG') {
         if (!element.complete) {
             element.addEventListener('load', () => consider(element), { once: true });
             return false;
@@ -142,12 +160,19 @@ function readyToScan(element) {
         if (element.naturalWidth < MIN_IMAGE_SIZE || element.naturalHeight < MIN_IMAGE_SIZE) return false;
         return true;
     }
-    if (element.tagName === 'VIDEO') {
+    if (tag === 'VIDEO') {
         if (siteListed) return true;
         if (element.poster) return true;
         if (element.readyState >= 2 && element.videoWidth >= MIN_IMAGE_SIZE) return true;
         element.addEventListener('loadeddata', () => consider(element), { once: true });
         return false;
+    }
+    if (tag === 'IFRAME') {
+        return elementSizeOk(element, MIN_AD_SIZE);
+    }
+    if (tag === 'A' || tag === 'DIV' || tag === 'SPAN' || tag === 'SECTION' || tag === 'ASIDE') {
+        if (!elementSizeOk(element, MIN_AD_SIZE)) return false;
+        return Boolean(backgroundImageUrl(element));
     }
     return false;
 }
@@ -167,8 +192,11 @@ const observer = new IntersectionObserver(entries => {
 
 function scan(root) {
     const scope = root && root.querySelectorAll ? root : document;
-    scope.querySelectorAll('img, video').forEach(consider);
-    if (root && (root.tagName === 'IMG' || root.tagName === 'VIDEO')) consider(root);
+    scope.querySelectorAll('img, video, iframe').forEach(consider);
+    scope.querySelectorAll('a, div, span, section, aside').forEach(element => {
+        if (backgroundImageUrl(element)) consider(element);
+    });
+    if (root && root.tagName) consider(root);
 }
 
 function syncAppearance() {
@@ -180,11 +208,11 @@ function syncAppearance() {
 }
 
 function filteringActive() {
-    return Boolean(settings && settings.enabled && settings.blurEnabled && !settings.excludedSites.includes(location.hostname));
+    return Boolean(settings && settings.enabled && settings.blurEnabled && !(settings.excludedSites || []).includes(location.hostname));
 }
 
 function rescan() {
-    document.querySelectorAll('img, video').forEach(element => {
+    document.querySelectorAll('img, video, iframe, a, div, span, section, aside').forEach(element => {
         delete element.dataset.nsfwWatch;
     });
     decided.clear();
@@ -209,7 +237,7 @@ function watchDom() {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['src', 'poster', 'srcset']
+        attributeFilter: ['src', 'poster', 'srcset', 'style', 'class']
     });
 }
 
