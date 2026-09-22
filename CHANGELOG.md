@@ -2,6 +2,12 @@
 
 All notable changes to NSFW Safe History are documented here.
 
+## [2.0.9] — 2026-09-22
+
+### Fixed
+- Options and popup blur toggles stay in sync (options switches save immediately; both listen to storage changes)
+- Options protection switches align to the right; clearer labels for Protection / Auto-clean / Blur NSFW media
+
 ## [2.0.8] — 2026-09-22
 
 ### Changed

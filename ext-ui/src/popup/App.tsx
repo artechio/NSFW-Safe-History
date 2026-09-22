@@ -58,6 +58,24 @@ export function PopupApp() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    function onStorageChanged(
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: string
+    ) {
+      if (area !== "sync") return
+      if (changes.blurEnabled && typeof changes.blurEnabled.newValue === "boolean") {
+        setBlurEnabled(changes.blurEnabled.newValue)
+      }
+      if (changes.excludedSites && host) {
+        const excluded = (changes.excludedSites.newValue as string[]) || []
+        setFilterSite(!excluded.includes(host))
+      }
+    }
+    chrome.storage.onChanged.addListener(onStorageChanged)
+    return () => chrome.storage.onChanged.removeListener(onStorageChanged)
+  }, [host])
+
   async function onFilterChange(checked: boolean) {
     if (!host) return
     setFilterSite(checked)
