@@ -2,6 +2,12 @@
 
 All notable changes to NSFW Safe History are documented here.
 
+## [2.0.8] — 2026-09-22
+
+### Added
+- GitHub Actions packs a signed **CRX3** release asset when `EXTENSION_PRIVATE_KEY` is set
+- `npm run pack:crx` and signing docs (`docs/SIGNING.md`)
+
 ## [2.0.7] — 2026-09-22
 
 ### Changed
