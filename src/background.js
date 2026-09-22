@@ -1,10 +1,12 @@
 const { parseHosts, hostMatches, isExcluded, BLOCKLIST_URL, BLOCKLIST_INTERVAL_MS } = require('./lib/domains');
-const { normalizeSettings } = require('./lib/settings');
+const { normalizeSettings, historyStartTime, normalizeCleanRange } = require('./lib/settings');
 const { isNsfwPrediction } = require('./lib/scores');
 const { readDomains, writeDomains } = require('./lib/blocklistDb');
+const { titleOrUrlLooksAdult } = require('./lib/historyMatch');
 
 const MAX_CONCURRENT = 2;
 const CLASSIFY_TIMEOUT_MS = 20000;
+const HISTORY_CHUNK_MS = 7 * 24 * 60 * 60 * 1000;
 
 let settingsCache = null;
 let domainSet = new Set();
@@ -69,16 +71,11 @@ function isListed(hostname) {
     return hostMatches(hostname, domainSet) || hostMatches(hostname, customSet);
 }
 
-function matchesDomainList(url, settings) {
-    if (!/^https?:/i.test(url || '')) return false;
-    const hostname = hostnameOf(url);
+function shouldCleanHistoryItem(item, settings) {
+    if (!item || !item.url || !/^https?:/i.test(item.url)) return false;
+    const hostname = hostnameOf(item.url);
     if (!hostname || isExcluded(hostname, settings.excludedSites)) return false;
-    return isListed(hostname);
-}
-
-function shouldDelete(url, settings) {
-    if (!settings.enabled || !settings.autoDeleteHistory) return false;
-    return matchesDomainList(url, settings);
+    return isListed(hostname) || titleOrUrlLooksAdult(item.url, item.title);
 }
 
 function deleteHistoryUrl(url) {
@@ -88,7 +85,8 @@ function deleteHistoryUrl(url) {
 async function handleVisit(item) {
     if (!item || !item.url || !blocklistLoaded) return;
     const settings = await getSettings();
-    if (shouldDelete(item.url, settings)) {
+    if (!settings.enabled || !settings.autoDeleteHistory) return;
+    if (shouldCleanHistoryItem(item, settings)) {
         await deleteHistoryUrl(item.url);
     }
 }
@@ -240,33 +238,48 @@ async function classifyForTab(urls, sender) {
     return { results };
 }
 
-async function clearMatchingHistory() {
+async function clearMatchingHistory(range) {
     await bootBlocklist();
     const settings = await getSettings();
-    const startTime = Date.now() - settings.historyLookbackDays * 24 * 60 * 60 * 1000;
+    const cleanRange = normalizeCleanRange(range || settings.lastCleanRange);
+    const startTime = historyStartTime(cleanRange);
     let endTime = Date.now();
     let deleted = 0;
+    const seen = new Set();
 
-    for (let page = 0; page < 20; page += 1) {
-        const items = await chromeCall(cb => chrome.history.search({
-            text: '',
-            startTime,
-            endTime,
-            maxResults: 1000
-        }, cb));
-        if (!items || !items.length) break;
+    while (endTime > startTime) {
+        const chunkStart = Math.max(startTime, endTime - HISTORY_CHUNK_MS);
+        let pageEnd = endTime;
 
-        let oldest = endTime;
-        for (const item of items) {
-            if (item.lastVisitTime && item.lastVisitTime < oldest) oldest = item.lastVisitTime;
-            if (matchesDomainList(item.url, settings)) {
+        for (let page = 0; page < 50; page += 1) {
+            const items = await chromeCall(cb => chrome.history.search({
+                text: '',
+                startTime: chunkStart,
+                endTime: pageEnd,
+                maxResults: 1000
+            }, cb));
+            if (!items || !items.length) break;
+
+            let oldest = pageEnd;
+            for (const item of items) {
+                if (item.lastVisitTime && item.lastVisitTime < oldest) oldest = item.lastVisitTime;
+                if (seen.has(item.url)) continue;
+                if (!shouldCleanHistoryItem(item, settings)) continue;
+                seen.add(item.url);
                 await deleteHistoryUrl(item.url);
                 deleted += 1;
             }
+
+            if (items.length < 1000) break;
+            pageEnd = oldest - 1;
+            if (pageEnd < chunkStart) break;
         }
 
-        if (items.length < 1000) break;
-        endTime = oldest - 1;
+        endTime = chunkStart - 1;
+    }
+
+    if (cleanRange !== settings.lastCleanRange) {
+        await saveSettings({ lastCleanRange: cleanRange });
     }
 
     return deleted;
@@ -316,7 +329,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.action === 'CLEAR_HISTORY') {
-        clearMatchingHistory()
+        clearMatchingHistory(message.range)
             .then(deleted => sendResponse({ ok: true, deleted }))
             .catch(error => sendResponse({ ok: false, error: error.message }));
         return true;

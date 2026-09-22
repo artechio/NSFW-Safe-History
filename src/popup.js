@@ -5,7 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearHistory = document.getElementById('clearHistory');
     const openOptions = document.getElementById('openOptions');
     const versionBadge = document.getElementById('versionBadge');
+    const rangeButtons = [...document.querySelectorAll('[data-range]')];
     let currentHost = '';
+    let selectedRange = 'week';
 
     versionBadge.textContent = `v${chrome.runtime.getManifest().version}`;
 
@@ -33,9 +35,25 @@ document.addEventListener('DOMContentLoaded', () => {
             : 'This site is excluded';
     }
 
+    function setSelectedRange(range) {
+        selectedRange = range;
+        rangeButtons.forEach(button => {
+            button.classList.toggle('is-selected', button.dataset.range === range);
+        });
+        clearHistory.disabled = false;
+        const labels = {
+            today: 'Clear today',
+            week: 'Clear this week',
+            month: 'Clear this month',
+            all: 'Clear all history'
+        };
+        clearHistory.querySelector('span').textContent = labels[range] || 'Clear selected range';
+    }
+
     sendMessage({ action: 'GET_SETTINGS' }).then(settings => {
         if (!settings || settings.error) throw new Error('settings');
         blurToggle.checked = Boolean(settings.blurEnabled);
+        setSelectedRange(settings.lastCleanRange || 'week');
         chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
             const tab = tabs && tabs[0];
             if (!tab || !tab.url) {
@@ -54,6 +72,10 @@ document.addEventListener('DOMContentLoaded', () => {
             setExcludeLabel(!excluded);
         });
     }).catch(() => showStatus('Could not load settings', 'error'));
+
+    rangeButtons.forEach(button => {
+        button.addEventListener('click', () => setSelectedRange(button.dataset.range));
+    });
 
     excludeToggle.addEventListener('change', () => {
         if (!currentHost) return;
@@ -78,8 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     clearHistory.addEventListener('click', () => {
+        if (!selectedRange) return;
         clearHistory.disabled = true;
-        sendMessage({ action: 'CLEAR_HISTORY' }).then(response => {
+        rangeButtons.forEach(button => {
+            button.disabled = true;
+        });
+        sendMessage({ action: 'CLEAR_HISTORY', range: selectedRange }).then(response => {
             if (!response || !response.ok) {
                 showStatus('Could not clean history', 'error');
                 return;
@@ -88,6 +114,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }).catch(() => showStatus('Could not clean history', 'error'))
             .finally(() => {
                 clearHistory.disabled = false;
+                rangeButtons.forEach(button => {
+                    button.disabled = false;
+                });
+                setSelectedRange(selectedRange);
             });
     });
 

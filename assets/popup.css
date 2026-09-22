@@ -151,6 +151,39 @@ body {
     background-color: #dc2626;
 }
 
+.btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.range-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.btn-range {
+    background-color: #374151;
+    color: white;
+    border: 1px solid #4b5563;
+    width: 100%;
+}
+
+.btn-range:hover {
+    background-color: #4b5563;
+}
+
+.btn-range.is-selected {
+    background-color: #1d4ed8;
+    border-color: #3b82f6;
+}
+
+.btn-range:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .btn-link {
     background: none;
     color: #60a5fa;
