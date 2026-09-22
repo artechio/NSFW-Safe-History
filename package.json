@@ -1,11 +1,14 @@
 {
   "name": "nsfw-safe-history",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "A Chrome extension to protect your browsing history from NSFW content",
   "main": "src/background.js",
   "scripts": {
-    "build": "webpack --mode production",
+    "build": "webpack --mode production && npm run build --prefix ext-ui",
+    "build:core": "webpack --mode production",
+    "build:ui": "npm run build --prefix ext-ui",
     "dev": "webpack --mode development --watch",
+    "dev:ui": "npm run dev --prefix ext-ui",
     "test": "node --test",
     "update-blocklist": "node scripts/update-blocklist.js",
     "download-model": "node scripts/download-model.js",
