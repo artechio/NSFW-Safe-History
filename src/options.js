@@ -1,150 +1,90 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    // Get DOM elements with error handling
-    const elements = {
-        cleanInterval: document.getElementById('clean-interval'),
-        customDateContainer: document.getElementById('custom-date-container'),
-        customDate: document.getElementById('custom-date'),
-        autoClean: document.getElementById('auto-clean'),
-        useDefaultKeywords: document.getElementById('useDefaultKeywords'),
-        defaultKeywords: document.getElementById('defaultKeywords'),
-        customKeywords: document.getElementById('customKeywords'),
-        importKeywords: document.getElementById('importKeywords'),
-        exportKeywords: document.getElementById('exportKeywords'),
-        saveKeywords: document.getElementById('saveKeywords'),
-        saveSettings: document.getElementById('saveSettings')
+document.addEventListener('DOMContentLoaded', () => {
+    const fields = {
+        enabled: document.getElementById('enabled'),
+        autoDeleteHistory: document.getElementById('autoDeleteHistory'),
+        blurEnabled: document.getElementById('blurEnabled'),
+        blurIntensity: document.getElementById('blurIntensity'),
+        nsfwThreshold: document.getElementById('nsfwThreshold'),
+        historyLookbackDays: document.getElementById('historyLookbackDays'),
+        customDomains: document.getElementById('customDomains'),
+        excludedSites: document.getElementById('excludedSites')
     };
+    const status = document.getElementById('status');
+    const blocklistMeta = document.getElementById('blocklistMeta');
+    const saveButton = document.getElementById('save');
+    const updateButton = document.getElementById('updateBlocklist');
 
-    // Validate all elements exist
-    for (const [key, element] of Object.entries(elements)) {
-        if (!element) {
-            console.error(`Element not found: ${key}`);
-            return;
-        }
+    function sendMessage(message) {
+        return new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(message, response => {
+                const err = chrome.runtime.lastError;
+                if (err) reject(new Error(err.message));
+                else resolve(response);
+            });
+        });
     }
 
-    // Load default keywords from file
-    async function loadDefaultKeywordsFile() {
-        try {
-            const response = await fetch(chrome.runtime.getURL('assets/keyword.txt'));
-            const text = await response.text();
-            elements.defaultKeywords.value = text;
-            return text.split('\n').filter(keyword => keyword.trim().length > 0);
-        } catch (error) {
-            console.error('Error loading default keywords:', error);
-            elements.defaultKeywords.value = 'Error loading default keywords';
-            return [];
-        }
-    }
-
-    // Load saved settings
-    async function loadSettings() {
-        const settings = await chrome.storage.sync.get([
-            'cleanInterval',
-            'customDate',
-            'autoClean',
-            'defaultKeywordsEnabled',
-            'keywords'
-        ]);
-
-        // Set clean interval
-        elements.cleanInterval.value = settings.cleanInterval || '1';
-        if (elements.cleanInterval.value === 'custom') {
-            elements.customDateContainer.classList.remove('hidden');
-            elements.customDate.value = settings.customDate || '';
-        }
-
-        // Set auto clean
-        elements.autoClean.checked = settings.autoClean !== false;
-
-        // Set default keywords toggle
-        elements.useDefaultKeywords.checked = settings.defaultKeywordsEnabled !== false;
-
-        // Load custom keywords
-        if (settings.keywords) {
-            elements.customKeywords.value = settings.keywords.map(k => k.data).join('\n');
-        }
-
-        // Load default keywords from file
-        await loadDefaultKeywordsFile();
-    }
-
-    // Save all settings
-    async function saveAllSettings() {
-        const settings = {
-            cleanInterval: elements.cleanInterval.value,
-            customDate: elements.customDate.value,
-            autoClean: elements.autoClean.checked,
-            defaultKeywordsEnabled: elements.useDefaultKeywords.checked,
-            keywords: elements.customKeywords.value
-                .split('\n')
-                .map(k => k.trim())
-                .filter(k => k)
-                .map(data => ({ data }))
-        };
-
-        try {
-            await chrome.storage.sync.set(settings);
-            showStatusMessage('Settings saved successfully');
-        } catch (error) {
-            console.error('Error saving settings:', error);
-            showStatusMessage('Error saving settings', 'red');
-        }
-    }
-
-    // Show status message
-    function showStatusMessage(message, color = 'green') {
-        const status = document.createElement('div');
+    function showStatus(message, ok) {
         status.textContent = message;
-        status.className = `status-message status-${color}`;
-        document.body.appendChild(status);
-        setTimeout(() => status.remove(), 3000);
+        status.className = ok ? 'status status-success' : 'status status-error';
     }
 
-    // Event Listeners
-    elements.cleanInterval.addEventListener('change', () => {
-        elements.customDateContainer.classList.toggle('hidden', 
-            elements.cleanInterval.value !== 'custom');
-    });
-
-    elements.importKeywords.addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.txt';
-        input.onchange = async (e) => {
-            try {
-                const file = e.target.files[0];
-                if (file) {
-                    const text = await file.text();
-                    elements.customKeywords.value = text;
-                    showStatusMessage('Keywords imported successfully');
-                }
-            } catch (error) {
-                console.error('Error importing keywords:', error);
-                showStatusMessage('Error importing keywords', 'red');
-            }
-        };
-        input.click();
-    });
-
-    elements.exportKeywords.addEventListener('click', () => {
-        try {
-            const blob = new Blob([elements.customKeywords.value], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'custom_keywords.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-            showStatusMessage('Keywords exported successfully');
-        } catch (error) {
-            console.error('Error exporting keywords:', error);
-            showStatusMessage('Error exporting keywords', 'red');
+    function fill(settings) {
+        fields.enabled.checked = settings.enabled;
+        fields.autoDeleteHistory.checked = settings.autoDeleteHistory;
+        fields.blurEnabled.checked = settings.blurEnabled;
+        fields.blurIntensity.value = settings.blurIntensity;
+        fields.nsfwThreshold.value = settings.nsfwThreshold;
+        fields.historyLookbackDays.value = String(settings.historyLookbackDays);
+        fields.customDomains.value = (settings.customDomains || []).join('\n');
+        fields.excludedSites.value = (settings.excludedSites || []).join('\n');
+        if (settings.lastBlocklistUpdate) {
+            blocklistMeta.textContent = `Domain list last updated ${new Date(settings.lastBlocklistUpdate).toLocaleString()}.`;
         }
+    }
+
+    function lines(value) {
+        return value.split('\n').map(line => line.trim()).filter(Boolean);
+    }
+
+    sendMessage({ action: 'GET_SETTINGS' })
+        .then(settings => {
+            if (!settings || settings.error) throw new Error('settings');
+            fill(settings);
+        })
+        .catch(() => showStatus('Could not load settings', false));
+
+    saveButton.addEventListener('click', () => {
+        sendMessage({
+            action: 'UPDATE_SETTINGS',
+            settings: {
+                enabled: fields.enabled.checked,
+                autoDeleteHistory: fields.autoDeleteHistory.checked,
+                blurEnabled: fields.blurEnabled.checked,
+                blurIntensity: Number(fields.blurIntensity.value),
+                nsfwThreshold: Number(fields.nsfwThreshold.value),
+                historyLookbackDays: Number(fields.historyLookbackDays.value),
+                customDomains: lines(fields.customDomains.value),
+                excludedSites: lines(fields.excludedSites.value)
+            }
+        }).then(settings => {
+            fill(settings);
+            showStatus('Settings saved', true);
+        }).catch(() => showStatus('Could not save settings', false));
     });
 
-    elements.saveKeywords.addEventListener('click', saveAllSettings);
-    elements.saveSettings.addEventListener('click', saveAllSettings);
-
-    // Initialize
-    await loadSettings();
+    updateButton.addEventListener('click', () => {
+        updateButton.disabled = true;
+        sendMessage({ action: 'UPDATE_BLOCKLIST' }).then(response => {
+            if (!response || !response.ok) {
+                showStatus('Could not update the domain list', false);
+                return;
+            }
+            showStatus(`Domain list updated (${response.count} domains)`, true);
+            return sendMessage({ action: 'GET_SETTINGS' }).then(fill);
+        }).catch(() => showStatus('Could not update the domain list', false))
+            .finally(() => {
+                updateButton.disabled = false;
+            });
+    });
 });

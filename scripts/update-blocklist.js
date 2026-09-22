@@ -1,37 +1,37 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { BLOCKLIST_URL, parseHosts } = require('../src/lib/domains');
 
-const BLOCKLIST_URL = 'https://raw.githubusercontent.com/columndeeply/hosts/main/lists/porn.txt';
-const OUTPUT_FILE = path.join(__dirname, '../assets/blocklist.txt');
+const outputFile = path.join(__dirname, '../assets/blocklist.txt');
 
-// Create directory if it doesn't exist
-const dir = path.dirname(OUTPUT_FILE);
-if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+function download(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, response => {
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                download(response.headers.location).then(resolve, reject);
+                return;
+            }
+            if (response.statusCode !== 200) {
+                reject(new Error(`Blocklist download failed: ${response.statusCode}`));
+                return;
+            }
+            const chunks = [];
+            response.on('data', chunk => chunks.push(chunk));
+            response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        }).on('error', reject);
+    });
 }
 
-// Download and process blocklist
-https.get(BLOCKLIST_URL, (res) => {
-    let data = '';
-
-    res.on('data', (chunk) => {
-        data += chunk;
+download(BLOCKLIST_URL)
+    .then(text => {
+        const domains = parseHosts(text).sort();
+        if (!domains.length) throw new Error('Parsed blocklist was empty');
+        fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+        fs.writeFileSync(outputFile, `${domains.join('\n')}\n`);
+        console.log(`Wrote ${domains.length} domains to ${outputFile}`);
+    })
+    .catch(error => {
+        console.error(error);
+        process.exit(1);
     });
-
-    res.on('end', () => {
-        // Process and clean the data
-        const domains = data
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line && !line.startsWith('#'))
-            .sort();
-
-        // Save to file
-        fs.writeFileSync(OUTPUT_FILE, domains.join('\n'));
-        console.log(`Updated blocklist with ${domains.length} domains`);
-    });
-}).on('error', (err) => {
-    console.error('Error downloading blocklist:', err);
-    process.exit(1);
-}); 
