@@ -1,105 +1,31 @@
-# NSFW Safe History Chrome Extension
+# NSFW Safe History
 
-A Chrome extension that helps protect your browsing history by automatically detecting and filtering NSFW content. The extension uses a combination of domain-based filtering and image processing to ensure a safer browsing experience.
+A Chrome extension that removes known adult sites from history as soon as they are visited, and blurs individual images only after an on-device model classifies them as adult.
 
-## Features
+Classification runs in the browser. Image bytes are not uploaded. The only network request the extension makes on its own is the weekly adult-domain list update.
 
-- 🔒 Automatic NSFW content detection and filtering
-- 🖼️ Image blurring with click-to-reveal functionality
-- 📝 Customizable keyword filtering
-- 🗑️ Automatic history cleaning for NSFW content
-- ⚙️ Customizable settings and preferences
-- 🔄 Regular updates to the NSFW domain blocklist
-- 🎯 Site-specific filtering options
+## What it does
 
-## Installation
+- Matches the hostname (and parent hostnames) against a domain set stored in IndexedDB.
+- Deletes that URL from Chrome history in `history.onVisited`, and again when the on-device model flags an image on the page.
+- Blurs only images whose `Porn` or `Hentai` score is at or above the threshold. A high `Sexy` score alone does not blur.
+- Leaves excluded hostnames untouched.
+- Does not scan page text, and does not delete every history entry for a domain.
+- Classifies video posters only, not every video frame. Text-only pages that are not on the domain list stay in history.
 
-### From Source
+## Install from source
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/nsfw-safe-history.git
-cd nsfw-safe-history
-```
+1. `npm install`
+2. `npm test`
+3. `npm run build`
+4. Open `chrome://extensions`, enable Developer mode, and load the `dist` folder.
 
-2. Install dependencies:
-```bash
-npm install
-```
+`npm run update-blocklist` refreshes `assets/blocklist.txt` from the Steven Black porn-only hosts list. `npm run download-model` refreshes the bundled MobileNet weights in `assets/model/`. `npm run generate-icons` rebuilds the PNG icons from `assets/icon.svg`.
 
-3. Build the extension:
-```bash
-npm run build
-```
+## Settings
 
-4. Load the extension in Chrome:
-   - Open Chrome and go to `chrome://extensions/`
-   - Enable "Developer mode" in the top right
-   - Click "Load unpacked" and select the `dist` folder
-
-### From Chrome Web Store
-
-*(Coming soon)*
-
-## Development
-
-### Prerequisites
-
-- Node.js (v14 or higher)
-- npm (v6 or higher)
-- Chrome browser
-
-### Project Structure
-
-```
-nsfw-safe-history/
-├── src/
-│   ├── background.js    # Background service worker
-│   ├── contentScript.js # Content script for page processing
-│   ├── popup.js        # Popup UI logic
-│   └── options.js      # Options page logic
-├── assets/             # Static assets (images, CSS)
-├── public/             # HTML files
-├── dist/              # Built extension
-└── manifest.json      # Extension manifest
-```
-
-### Building
-
-```bash
-# Development build
-npm run dev
-
-# Production build
-npm run build
-```
-
-### Testing
-
-1. Load the extension in Chrome
-2. Visit a test website
-3. Check the console for any errors
-4. Verify that images are properly blurred
-5. Test the history cleaning functionality
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Protection, blur strength, detection threshold, custom domains, excluded sites, and the manual history range live on the options page. The popup turns filtering off for the current site, toggles blur, and runs a manual history clean.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- NSFW domain list from [columndeeply/hosts](https://github.com/columndeeply/hosts)
-- Icons from [Heroicons](https://heroicons.com/)
-- UI components inspired by modern design patterns
-
-## Support
-
-If you encounter any issues or have suggestions, please open an issue in the GitHub repository.
+MIT. See [LICENSE](LICENSE). The domain list is the [Steven Black porn-only hosts list](https://github.com/StevenBlack/hosts). Image classification uses [nsfwjs](https://github.com/infinitered/nsfwjs).
