@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,39 +14,39 @@
 
     <div class="section">
         <div class="toggle-wrapper">
-            <span class="toggle-label">Filter this site</span>
+            <span class="toggle-label">فیلتر این سایت</span>
             <label class="toggle">
                 <input type="checkbox" id="excludeToggle" class="toggle-checkbox" checked>
             </label>
         </div>
-        <p id="excludeToggleLabel" class="toggle-status">History cleaning and blur are on for this site</p>
+        <p id="excludeToggleLabel" class="toggle-status">پاک‌کردن هیستوری و بلور برای این سایت فعال است</p>
     </div>
 
     <div class="section">
         <div class="toggle-wrapper">
-            <span class="toggle-label">Blur NSFW images</span>
+            <span class="toggle-label">بلور تصاویر NSFW</span>
             <label class="toggle">
                 <input type="checkbox" id="blurToggle" class="toggle-checkbox" checked>
             </label>
         </div>
-        <p class="toggle-status">Only images the on-device model marks as adult are blurred.</p>
+        <p class="toggle-status">فقط تصاویری که مدل روی دستگاه به‌عنوان محتوای بزرگسال تشخیص دهد بلور می‌شوند.</p>
     </div>
 
     <div class="section" id="clearSection">
-        <p class="toggle-label">Clear matching history</p>
-        <p class="toggle-status">Which period should be cleaned?</p>
-        <div class="range-grid" role="group" aria-label="History range">
-            <button type="button" class="btn btn-range" data-range="today">Today</button>
-            <button type="button" class="btn btn-range" data-range="week">This week</button>
-            <button type="button" class="btn btn-range" data-range="month">This month</button>
-            <button type="button" class="btn btn-range" data-range="all">All history</button>
+        <p class="toggle-label">پاک‌کردن هیستوری منطبق</p>
+        <p class="toggle-status">کدام بازه پاک شود؟</p>
+        <div class="range-grid" role="group" aria-label="بازه هیستوری">
+            <button type="button" class="btn btn-range" data-range="today">امروز</button>
+            <button type="button" class="btn btn-range" data-range="week">هفته</button>
+            <button type="button" class="btn btn-range" data-range="month">ماه</button>
+            <button type="button" class="btn btn-range" data-range="all">کل تاریخچه</button>
         </div>
         <button id="clearHistory" class="btn btn-danger" type="button" disabled>
-            <span>Clear selected range</span>
+            <span>پاک‌کردن بازه انتخاب‌شده</span>
         </button>
     </div>
 
-    <button id="openOptions" class="btn btn-link" type="button">Advanced settings</button>
+    <button id="openOptions" class="btn btn-link" type="button">تنظیمات پیشرفته</button>
     <script src="popup.js"></script>
 </body>
 </html>
