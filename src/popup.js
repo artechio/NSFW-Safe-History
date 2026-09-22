@@ -116,23 +116,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setBusy(true);
         clearHistory.querySelector('span').textContent = 'Clearing…';
-        sendMessage({ action: 'CLEAR_HISTORY', range: selectedRange }).then(response => {
-            if (!response || !response.ok) {
-                showStatus('Could not clean history', 'error');
-                return;
-            }
-            const deleted = Number(response.deleted) || 0;
+        let finished = false;
+        const showDeleted = deleted => {
+            if (finished) return;
+            finished = true;
             showStatus(
                 deleted > 0
                     ? `Removed ${deleted} history entries`
                     : 'No matching history left in that range',
                 'success'
             );
-        }).catch(() => showStatus('Could not clean history', 'error'))
-            .finally(() => {
-                setBusy(false);
-                setSelectedRange(selectedRange);
-            });
+            setBusy(false);
+            setSelectedRange(selectedRange);
+        };
+
+        const onSessionChange = (changes, area) => {
+            if (area !== 'session' || !changes.lastClearDeleted) return;
+            chrome.storage.onChanged.removeListener(onSessionChange);
+            showDeleted(Number(changes.lastClearDeleted.newValue) || 0);
+        };
+        chrome.storage.onChanged.addListener(onSessionChange);
+
+        sendMessage({ action: 'CLEAR_HISTORY', range: selectedRange }).then(response => {
+            if (!response || !response.ok) {
+                if (!finished) {
+                    finished = true;
+                    chrome.storage.onChanged.removeListener(onSessionChange);
+                    showStatus('Could not clean history', 'error');
+                    setBusy(false);
+                    setSelectedRange(selectedRange);
+                }
+                return;
+            }
+            chrome.storage.onChanged.removeListener(onSessionChange);
+            showDeleted(Number(response.deleted) || 0);
+        }).catch(() => {
+            // Result may still arrive via storage.session from the service worker.
+            setTimeout(() => {
+                if (finished) return;
+                chrome.storage.session.get(['lastClearDeleted', 'lastClearAt']).then(data => {
+                    if (data.lastClearAt && Date.now() - Number(data.lastClearAt) < 15000) {
+                        chrome.storage.onChanged.removeListener(onSessionChange);
+                        showDeleted(Number(data.lastClearDeleted) || 0);
+                        return;
+                    }
+                    if (!finished) {
+                        finished = true;
+                        chrome.storage.onChanged.removeListener(onSessionChange);
+                        showStatus('Could not clean history', 'error');
+                        setBusy(false);
+                        setSelectedRange(selectedRange);
+                    }
+                });
+            }, 1500);
+        });
     });
 
     openOptions.addEventListener('click', () => {

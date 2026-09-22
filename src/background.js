@@ -26,23 +26,9 @@ const waiters = [];
 const pendingClassify = new Map();
 const imageCache = new Map();
 
-function chromeCall(fn) {
-    return new Promise((resolve, reject) => {
-        try {
-            fn(result => {
-                const err = chrome.runtime.lastError;
-                if (err) reject(new Error(err.message));
-                else resolve(result);
-            });
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-
 function getSettings() {
     if (settingsCache) return Promise.resolve(settingsCache);
-    return chromeCall(cb => chrome.storage.sync.get(null, cb)).then(stored => {
+    return chrome.storage.sync.get(null).then(stored => {
         const settings = normalizeSettings(stored);
         applySettings(settings);
         return settings;
@@ -52,7 +38,7 @@ function getSettings() {
 function saveSettings(partial) {
     return getSettings().then(current => {
         const next = normalizeSettings({ ...current, ...partial });
-        return chromeCall(cb => chrome.storage.sync.set(next, cb)).then(() => {
+        return chrome.storage.sync.set(next).then(() => {
             applySettings(next);
             return next;
         });
@@ -89,17 +75,21 @@ function shouldCleanHistoryItem(item, settings) {
     return isListed(hostname) || titleOrUrlLooksAdult(item.url, item.title);
 }
 
-async function bumpDeleted(count) {
-    if (!count) return;
-    const current = await chromeCall(cb => chrome.storage.session.get(['deletedTotal', 'lastClearDeleted'], cb)).catch(() => ({}));
-    await chromeCall(cb => chrome.storage.session.set({
-        deletedTotal: (Number(current.deletedTotal) || 0) + count,
-        lastClearDeleted: count
-    }, cb)).catch(() => {});
+async function bumpDeleted(count, options = {}) {
+    const amount = Number(count) || 0;
+    const current = await chrome.storage.session.get(['deletedTotal']);
+    const update = {
+        deletedTotal: (Number(current.deletedTotal) || 0) + amount
+    };
+    if (options.isClear) {
+        update.lastClearDeleted = amount;
+        update.lastClearAt = Date.now();
+    }
+    await chrome.storage.session.set(update);
 }
 
 async function deleteHistoryUrl(url) {
-    await chromeCall(cb => chrome.history.deleteUrl({ url }, cb));
+    await chrome.history.deleteUrl({ url });
     return true;
 }
 
@@ -274,36 +264,50 @@ async function collectHistoryItems(startTime) {
     const seen = new Set();
     const collected = [];
 
-    for (const text of HISTORY_SEARCH_QUERIES) {
-        let endTime = Date.now();
-        while (endTime > startTime) {
-            const chunkStart = Math.max(startTime, endTime - HISTORY_CHUNK_MS);
-            let pageEnd = endTime;
-
-            for (let page = 0; page < 40; page += 1) {
-                const items = await chromeCall(cb => chrome.history.search({
-                    text,
-                    startTime: chunkStart,
-                    endTime: pageEnd,
-                    maxResults: 1000
-                }, cb));
-                if (!items || !items.length) break;
-
-                let oldest = pageEnd;
-                for (const item of items) {
-                    if (item.lastVisitTime && item.lastVisitTime < oldest) oldest = item.lastVisitTime;
-                    if (!item.url || seen.has(item.url)) continue;
-                    seen.add(item.url);
-                    collected.push(item);
-                }
-
-                if (items.length < 1000) break;
-                pageEnd = oldest - 1;
-                if (pageEnd < chunkStart) break;
-            }
-
-            endTime = chunkStart - 1;
+    async function take(items) {
+        for (const item of items || []) {
+            if (!item.url || seen.has(item.url)) continue;
+            seen.add(item.url);
+            collected.push(item);
         }
+    }
+
+    for (const text of HISTORY_SEARCH_QUERIES) {
+        if (!text) continue;
+        const items = await chrome.history.search({
+            text,
+            startTime,
+            maxResults: 1000
+        });
+        await take(items);
+    }
+
+    let endTime = Date.now();
+    while (endTime > startTime) {
+        const chunkStart = Math.max(startTime, endTime - HISTORY_CHUNK_MS);
+        let pageEnd = endTime;
+
+        for (let page = 0; page < 40; page += 1) {
+            const items = await chrome.history.search({
+                text: '',
+                startTime: chunkStart,
+                endTime: pageEnd,
+                maxResults: 1000
+            });
+            if (!items || !items.length) break;
+
+            let oldest = pageEnd;
+            for (const item of items) {
+                if (item.lastVisitTime && item.lastVisitTime < oldest) oldest = item.lastVisitTime;
+            }
+            await take(items);
+
+            if (items.length < 1000) break;
+            pageEnd = oldest - 1;
+            if (pageEnd < chunkStart) break;
+        }
+
+        endTime = chunkStart - 1;
     }
 
     return collected;
@@ -315,19 +319,17 @@ async function clearMatchingHistory(range) {
     const cleanRange = normalizeCleanRange(range || settings.lastCleanRange);
     const startTime = historyStartTime(cleanRange);
     const items = await collectHistoryItems(startTime);
+    const targets = items.filter(item => shouldCleanHistoryItem(item, settings));
     let deleted = 0;
+    const batchSize = 25;
 
-    for (const item of items) {
-        if (!shouldCleanHistoryItem(item, settings)) continue;
-        try {
-            await deleteHistoryUrl(item.url);
-            deleted += 1;
-        } catch (error) {
-            console.warn('Failed to delete', item.url, error);
-        }
+    for (let index = 0; index < targets.length; index += batchSize) {
+        const batch = targets.slice(index, index + batchSize);
+        const results = await Promise.allSettled(batch.map(item => deleteHistoryUrl(item.url)));
+        deleted += results.filter(result => result.status === 'fulfilled').length;
     }
 
-    await bumpDeleted(deleted);
+    await bumpDeleted(deleted, { isClear: true });
     if (cleanRange !== settings.lastCleanRange) {
         await saveSettings({ lastCleanRange: cleanRange });
     }
