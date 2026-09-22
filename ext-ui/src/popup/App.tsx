@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -138,40 +139,36 @@ export function PopupApp() {
         </header>
 
         <Card size="sm">
-          <CardHeader className="gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <CardTitle>Filter this site</CardTitle>
-                <CardDescription>
-                  {filterSite
-                    ? "History cleaning and blur are on for this site"
-                    : "This site is excluded"}
-                </CardDescription>
-              </div>
+          <CardHeader>
+            <CardTitle>Filter this site</CardTitle>
+            <CardDescription>
+              {filterSite
+                ? "History cleaning and blur are on for this site"
+                : "This site is excluded"}
+            </CardDescription>
+            <CardAction>
               <Switch
                 checked={filterSite}
                 disabled={loading || !host}
                 onCheckedChange={onFilterChange}
               />
-            </div>
+            </CardAction>
           </CardHeader>
         </Card>
 
         <Card size="sm">
-          <CardHeader className="gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <CardTitle>Blur NSFW media</CardTitle>
-                <CardDescription>
-                  Blur images, videos, and ads marked as adult.
-                </CardDescription>
-              </div>
+          <CardHeader>
+            <CardTitle>Blur NSFW media</CardTitle>
+            <CardDescription>
+              Blur images, videos, and ads marked as adult.
+            </CardDescription>
+            <CardAction>
               <Switch
                 checked={blurEnabled}
                 disabled={loading}
                 onCheckedChange={onBlurChange}
               />
-            </div>
+            </CardAction>
           </CardHeader>
         </Card>
 
