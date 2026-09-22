@@ -5,8 +5,9 @@ const { readDomains, writeDomains } = require('./lib/blocklistDb');
 const { titleOrUrlLooksAdult } = require('./lib/historyMatch');
 
 const MAX_CONCURRENT = 2;
-const CLASSIFY_TIMEOUT_MS = 20000;
+const CLASSIFY_TIMEOUT_MS = 25000;
 const HISTORY_CHUNK_MS = 7 * 24 * 60 * 60 * 1000;
+const HISTORY_SEARCH_QUERIES = ['', 'porn', 'xxx', 'pornhub', 'xvideos', 'xnxx', 'onlyfans', 'hentai', 'nsfw'];
 
 let settingsCache = null;
 let domainSet = new Set();
@@ -25,19 +26,9 @@ const waiters = [];
 const pendingClassify = new Map();
 const imageCache = new Map();
 
-function chromeCall(fn) {
-    return new Promise((resolve, reject) => {
-        fn(result => {
-            const err = chrome.runtime.lastError;
-            if (err) reject(new Error(err.message));
-            else resolve(result);
-        });
-    });
-}
-
 function getSettings() {
     if (settingsCache) return Promise.resolve(settingsCache);
-    return chromeCall(cb => chrome.storage.sync.get(null, cb)).then(stored => {
+    return chrome.storage.sync.get(null).then(stored => {
         const settings = normalizeSettings(stored);
         applySettings(settings);
         return settings;
@@ -47,7 +38,7 @@ function getSettings() {
 function saveSettings(partial) {
     return getSettings().then(current => {
         const next = normalizeSettings({ ...current, ...partial });
-        return chromeCall(cb => chrome.storage.sync.set(next, cb)).then(() => {
+        return chrome.storage.sync.set(next).then(() => {
             applySettings(next);
             return next;
         });
@@ -71,6 +62,12 @@ function isListed(hostname) {
     return hostMatches(hostname, domainSet) || hostMatches(hostname, customSet);
 }
 
+function siteIsProtected(hostname, settings) {
+    if (!hostname) return false;
+    if (isExcluded(hostname, settings.excludedSites)) return false;
+    return isListed(hostname);
+}
+
 function shouldCleanHistoryItem(item, settings) {
     if (!item || !item.url || !/^https?:/i.test(item.url)) return false;
     const hostname = hostnameOf(item.url);
@@ -78,8 +75,22 @@ function shouldCleanHistoryItem(item, settings) {
     return isListed(hostname) || titleOrUrlLooksAdult(item.url, item.title);
 }
 
-function deleteHistoryUrl(url) {
-    return chromeCall(cb => chrome.history.deleteUrl({ url }, cb));
+async function bumpDeleted(count, options = {}) {
+    const amount = Number(count) || 0;
+    const current = await chrome.storage.session.get(['deletedTotal']);
+    const update = {
+        deletedTotal: (Number(current.deletedTotal) || 0) + amount
+    };
+    if (options.isClear) {
+        update.lastClearDeleted = amount;
+        update.lastClearAt = Date.now();
+    }
+    await chrome.storage.session.set(update);
+}
+
+async function deleteHistoryUrl(url) {
+    await chrome.history.deleteUrl({ url });
+    return true;
 }
 
 async function handleVisit(item) {
@@ -88,6 +99,7 @@ async function handleVisit(item) {
     if (!settings.enabled || !settings.autoDeleteHistory) return;
     if (shouldCleanHistoryItem(item, settings)) {
         await deleteHistoryUrl(item.url);
+        await bumpDeleted(1);
     }
 }
 
@@ -162,8 +174,8 @@ async function ensureOffscreen() {
             }
             await chrome.offscreen.createDocument({
                 url: 'offscreen.html',
-                reasons: ['WORKERS'],
-                justification: 'Run the local NSFW image model outside the service worker'
+                reasons: ['BLOBS', 'DOM_SCRAPING'],
+                justification: 'Classify images with an on-device NSFW model'
             });
             await waitForPort();
         })().finally(() => {
@@ -189,6 +201,10 @@ function schedule(task) {
 
 function requestClassify(url) {
     return ensureOffscreen().then(() => new Promise((resolve, reject) => {
+        if (!classifierPort) {
+            reject(new Error('Classifier port missing'));
+            return;
+        }
         const id = String(++nextId);
         const timer = setTimeout(() => {
             pendingClassify.delete(id);
@@ -208,6 +224,7 @@ async function classifyCached(url, threshold) {
         return nsfw;
     } catch (error) {
         console.warn('Image classification failed', error);
+        imageCache.set(url, false);
         return false;
     }
 }
@@ -217,10 +234,14 @@ async function classifyForTab(urls, sender) {
     const settings = await getSettings();
     const pageUrl = sender && sender.tab && sender.tab.url;
     const hostname = hostnameOf(pageUrl);
-    const list = [...new Set((urls || []).filter(url => typeof url === 'string' && /^https?:/i.test(url)))].slice(0, 12);
+    const list = [...new Set((urls || []).filter(url => typeof url === 'string' && (/^https?:/i.test(url) || url.startsWith('data:image/'))))].slice(0, 12);
 
     if (!settings.enabled || !settings.blurEnabled || isExcluded(hostname, settings.excludedSites)) {
         return { results: list.map(url => ({ url, nsfw: false })), skipped: true };
+    }
+
+    if (siteIsProtected(hostname, settings)) {
+        return { results: list.map(url => ({ url, nsfw: true })), listed: true };
     }
 
     const results = [];
@@ -231,44 +252,55 @@ async function classifyForTab(urls, sender) {
         results.push({ url, nsfw });
     }
 
-    if (anyNsfw && settings.autoDeleteHistory && pageUrl && /^https?:/i.test(pageUrl) && !isExcluded(hostname, settings.excludedSites)) {
+    if (anyNsfw && settings.autoDeleteHistory && pageUrl && /^https?:/i.test(pageUrl)) {
         await deleteHistoryUrl(pageUrl);
+        await bumpDeleted(1);
     }
 
     return { results };
 }
 
-async function clearMatchingHistory(range) {
-    await bootBlocklist();
-    const settings = await getSettings();
-    const cleanRange = normalizeCleanRange(range || settings.lastCleanRange);
-    const startTime = historyStartTime(cleanRange);
-    let endTime = Date.now();
-    let deleted = 0;
+async function collectHistoryItems(startTime) {
     const seen = new Set();
+    const collected = [];
 
+    async function take(items) {
+        for (const item of items || []) {
+            if (!item.url || seen.has(item.url)) continue;
+            seen.add(item.url);
+            collected.push(item);
+        }
+    }
+
+    for (const text of HISTORY_SEARCH_QUERIES) {
+        if (!text) continue;
+        const items = await chrome.history.search({
+            text,
+            startTime,
+            maxResults: 1000
+        });
+        await take(items);
+    }
+
+    let endTime = Date.now();
     while (endTime > startTime) {
         const chunkStart = Math.max(startTime, endTime - HISTORY_CHUNK_MS);
         let pageEnd = endTime;
 
-        for (let page = 0; page < 50; page += 1) {
-            const items = await chromeCall(cb => chrome.history.search({
+        for (let page = 0; page < 40; page += 1) {
+            const items = await chrome.history.search({
                 text: '',
                 startTime: chunkStart,
                 endTime: pageEnd,
                 maxResults: 1000
-            }, cb));
+            });
             if (!items || !items.length) break;
 
             let oldest = pageEnd;
             for (const item of items) {
                 if (item.lastVisitTime && item.lastVisitTime < oldest) oldest = item.lastVisitTime;
-                if (seen.has(item.url)) continue;
-                if (!shouldCleanHistoryItem(item, settings)) continue;
-                seen.add(item.url);
-                await deleteHistoryUrl(item.url);
-                deleted += 1;
             }
+            await take(items);
 
             if (items.length < 1000) break;
             pageEnd = oldest - 1;
@@ -278,11 +310,42 @@ async function clearMatchingHistory(range) {
         endTime = chunkStart - 1;
     }
 
+    return collected;
+}
+
+async function clearMatchingHistory(range) {
+    await bootBlocklist();
+    const settings = await getSettings();
+    const cleanRange = normalizeCleanRange(range || settings.lastCleanRange);
+    const startTime = historyStartTime(cleanRange);
+    const items = await collectHistoryItems(startTime);
+    const targets = items.filter(item => shouldCleanHistoryItem(item, settings));
+    let deleted = 0;
+    const batchSize = 25;
+
+    for (let index = 0; index < targets.length; index += batchSize) {
+        const batch = targets.slice(index, index + batchSize);
+        const results = await Promise.allSettled(batch.map(item => deleteHistoryUrl(item.url)));
+        deleted += results.filter(result => result.status === 'fulfilled').length;
+    }
+
+    await bumpDeleted(deleted, { isClear: true });
     if (cleanRange !== settings.lastCleanRange) {
         await saveSettings({ lastCleanRange: cleanRange });
     }
 
     return deleted;
+}
+
+async function getSiteStatus(hostname) {
+    await bootBlocklist();
+    const settings = await getSettings();
+    const host = String(hostname || '').toLowerCase();
+    return {
+        ...settings,
+        listed: siteIsProtected(host, settings),
+        hostname: host
+    };
 }
 
 chrome.runtime.onConnect.addListener(port => {
@@ -315,6 +378,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (message.action === 'GET_SETTINGS') {
         getSettings().then(sendResponse).catch(error => sendResponse({ error: error.message }));
+        return true;
+    }
+
+    if (message.action === 'GET_SITE_STATUS') {
+        const hostname = message.hostname || (sender.tab && hostnameOf(sender.tab.url));
+        getSiteStatus(hostname).then(sendResponse).catch(error => sendResponse({ error: error.message }));
         return true;
     }
 
