@@ -1,6 +1,10 @@
 img.nsfw-blur,
 video.nsfw-blur {
-    filter: blur(var(--blur-intensity, 20px));
+    filter: blur(var(--blur-intensity, 20px)) !important;
     cursor: pointer;
     transition: filter 0.2s ease;
+}
+
+video.nsfw-blur::-webkit-media-controls {
+    filter: none;
 }
