@@ -39,6 +39,50 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "zip=${zip_name}" >> "$GITHUB_OUTPUT"
 
+      - name: Compose release notes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: notes
+        run: |
+          version="${{ steps.package.outputs.version }}"
+          node <<'NODE'
+          const fs = require('fs');
+          const version = process.env.VERSION;
+          const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+          const heading = `## [${version}]`;
+          const start = changelog.indexOf(heading);
+          let body = '';
+          if (start !== -1) {
+            let rest = changelog.slice(start + heading.length);
+            rest = rest.replace(/^\s*—\s*[^\n]*\n?/, '');
+            const next = rest.search(/\n## \[/);
+            body = (next === -1 ? rest : rest.slice(0, next)).trim();
+          }
+          const notes = [
+            `## NSFW Safe History v${version}`,
+            '',
+            'Chrome extension that clears adult sites from history on visit and blurs NSFW media with on-device classification — no image upload.',
+            '',
+            body || 'See CHANGELOG.md for details.',
+            '',
+            '### Install',
+            '1. Download `nsfw-safe-history-' + version + '.zip` below',
+            '2. Unzip the archive',
+            '3. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**',
+            '4. Select the unzipped folder (contains `manifest.json`)',
+            '',
+            '### Links',
+            '- [README](https://github.com/artechio/NSFW-Safe-History#readme)',
+            '- [Changelog](https://github.com/artechio/NSFW-Safe-History/blob/main/CHANGELOG.md)',
+            '- [Report an issue](https://github.com/artechio/NSFW-Safe-History/issues)',
+            ''
+          ].join('\n');
+          fs.writeFileSync('release-notes.md', notes);
+          console.log(notes);
+          NODE
+          echo "file=release-notes.md" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: nsfw-safe-history
@@ -53,18 +97,15 @@ jobs:
           version="${{ steps.package.outputs.version }}"
           zip_name="${{ steps.package.outputs.zip }}"
           tag="v${version}"
-          notes="$(cat <<EOF
-          Chrome extension build for version ${version}.
-
-          Download the zip, unzip it, open chrome://extensions, enable Developer mode, and Load unpacked on the extracted folder.
-          EOF
-          )"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "$zip_name" --clobber
-            gh release edit "$tag" --title "NSFW Safe History v${version}" --notes "$notes" --latest
+            gh release edit "$tag" \
+              --title "NSFW Safe History v${version}" \
+              --notes-file release-notes.md \
+              --latest
           else
             gh release create "$tag" "$zip_name" \
               --title "NSFW Safe History v${version}" \
-              --notes "$notes" \
+              --notes-file release-notes.md \
               --latest
           fi
