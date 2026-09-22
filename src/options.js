@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
         blurEnabled: document.getElementById('blurEnabled'),
         blurIntensity: document.getElementById('blurIntensity'),
         nsfwThreshold: document.getElementById('nsfwThreshold'),
-        historyLookbackDays: document.getElementById('historyLookbackDays'),
         customDomains: document.getElementById('customDomains'),
         excludedSites: document.getElementById('excludedSites')
     };
@@ -35,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fields.blurEnabled.checked = settings.blurEnabled;
         fields.blurIntensity.value = settings.blurIntensity;
         fields.nsfwThreshold.value = settings.nsfwThreshold;
-        fields.historyLookbackDays.value = String(settings.historyLookbackDays);
         fields.customDomains.value = (settings.customDomains || []).join('\n');
         fields.excludedSites.value = (settings.excludedSites || []).join('\n');
         if (settings.lastBlocklistUpdate) {
@@ -63,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 blurEnabled: fields.blurEnabled.checked,
                 blurIntensity: Number(fields.blurIntensity.value),
                 nsfwThreshold: Number(fields.nsfwThreshold.value),
-                historyLookbackDays: Number(fields.historyLookbackDays.value),
                 customDomains: lines(fields.customDomains.value),
                 excludedSites: lines(fields.excludedSites.value)
             }
