@@ -1,12 +1,13 @@
 {
   "name": "nsfw-safe-history",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Chrome extension: clear adult sites from history on visit and blur NSFW images on-device",
   "main": "src/background.js",
   "scripts": {
     "build": "webpack --mode production && npm run build --prefix ext-ui",
     "build:core": "webpack --mode production",
     "build:ui": "npm run build --prefix ext-ui",
+    "pack:crx": "node scripts/pack-crx.js",
     "dev": "webpack --mode development --watch",
     "dev:ui": "npm run dev --prefix ext-ui",
     "test": "node --test",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "copy-webpack-plugin": "^12.0.2",
+    "crx3": "^2.0.0",
     "sharp": "^0.33.5",
     "webpack": "^5.90.3",
     "webpack-cli": "^5.1.4"

@@ -39,9 +39,11 @@ Useful if you search for a **Chrome NSFW history cleaner**, **adult site history
 ## Install from GitHub Release (recommended)
 
 1. Open the [latest release](https://github.com/artechio/NSFW-Safe-History/releases/latest).
-2. Download `nsfw-safe-history-*.zip` and unzip it.
+2. Download `nsfw-safe-history-*.zip` (or the `.crx` when published) and unzip the ZIP if needed.
 3. Go to `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.
 4. Select the unzipped folder (the one that contains `manifest.json`).
+
+Signed CRX builds are produced in CI when the `EXTENSION_PRIVATE_KEY` secret is configured. See [docs/SIGNING.md](docs/SIGNING.md).
 
 ## Install from source
 
