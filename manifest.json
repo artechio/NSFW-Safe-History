@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "NSFW Safe History",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "description": "Remove adult sites from history immediately and blur images classified on your device",
     "permissions": [
         "storage",
@@ -39,5 +39,8 @@
             "css": ["content.css"],
             "run_at": "document_idle"
         }
-    ]
+    ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    }
 }
