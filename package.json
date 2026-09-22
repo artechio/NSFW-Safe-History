@@ -1,6 +1,6 @@
 {
   "name": "nsfw-safe-history",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "A Chrome extension to protect your browsing history from NSFW content",
   "main": "src/background.js",
   "scripts": {

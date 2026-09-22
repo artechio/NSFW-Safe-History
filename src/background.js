@@ -5,8 +5,9 @@ const { readDomains, writeDomains } = require('./lib/blocklistDb');
 const { titleOrUrlLooksAdult } = require('./lib/historyMatch');
 
 const MAX_CONCURRENT = 2;
-const CLASSIFY_TIMEOUT_MS = 20000;
+const CLASSIFY_TIMEOUT_MS = 25000;
 const HISTORY_CHUNK_MS = 7 * 24 * 60 * 60 * 1000;
+const HISTORY_SEARCH_QUERIES = ['', 'porn', 'xxx', 'pornhub', 'xvideos', 'xnxx', 'onlyfans', 'hentai', 'nsfw'];
 
 let settingsCache = null;
 let domainSet = new Set();
@@ -27,11 +28,15 @@ const imageCache = new Map();
 
 function chromeCall(fn) {
     return new Promise((resolve, reject) => {
-        fn(result => {
-            const err = chrome.runtime.lastError;
-            if (err) reject(new Error(err.message));
-            else resolve(result);
-        });
+        try {
+            fn(result => {
+                const err = chrome.runtime.lastError;
+                if (err) reject(new Error(err.message));
+                else resolve(result);
+            });
+        } catch (error) {
+            reject(error);
+        }
     });
 }
 
@@ -71,6 +76,12 @@ function isListed(hostname) {
     return hostMatches(hostname, domainSet) || hostMatches(hostname, customSet);
 }
 
+function siteIsProtected(hostname, settings) {
+    if (!hostname) return false;
+    if (isExcluded(hostname, settings.excludedSites)) return false;
+    return isListed(hostname);
+}
+
 function shouldCleanHistoryItem(item, settings) {
     if (!item || !item.url || !/^https?:/i.test(item.url)) return false;
     const hostname = hostnameOf(item.url);
@@ -78,8 +89,18 @@ function shouldCleanHistoryItem(item, settings) {
     return isListed(hostname) || titleOrUrlLooksAdult(item.url, item.title);
 }
 
-function deleteHistoryUrl(url) {
-    return chromeCall(cb => chrome.history.deleteUrl({ url }, cb));
+async function bumpDeleted(count) {
+    if (!count) return;
+    const current = await chromeCall(cb => chrome.storage.session.get(['deletedTotal', 'lastClearDeleted'], cb)).catch(() => ({}));
+    await chromeCall(cb => chrome.storage.session.set({
+        deletedTotal: (Number(current.deletedTotal) || 0) + count,
+        lastClearDeleted: count
+    }, cb)).catch(() => {});
+}
+
+async function deleteHistoryUrl(url) {
+    await chromeCall(cb => chrome.history.deleteUrl({ url }, cb));
+    return true;
 }
 
 async function handleVisit(item) {
@@ -88,6 +109,7 @@ async function handleVisit(item) {
     if (!settings.enabled || !settings.autoDeleteHistory) return;
     if (shouldCleanHistoryItem(item, settings)) {
         await deleteHistoryUrl(item.url);
+        await bumpDeleted(1);
     }
 }
 
@@ -162,8 +184,8 @@ async function ensureOffscreen() {
             }
             await chrome.offscreen.createDocument({
                 url: 'offscreen.html',
-                reasons: ['WORKERS'],
-                justification: 'Run the local NSFW image model outside the service worker'
+                reasons: ['BLOBS', 'DOM_SCRAPING'],
+                justification: 'Classify images with an on-device NSFW model'
             });
             await waitForPort();
         })().finally(() => {
@@ -189,6 +211,10 @@ function schedule(task) {
 
 function requestClassify(url) {
     return ensureOffscreen().then(() => new Promise((resolve, reject) => {
+        if (!classifierPort) {
+            reject(new Error('Classifier port missing'));
+            return;
+        }
         const id = String(++nextId);
         const timer = setTimeout(() => {
             pendingClassify.delete(id);
@@ -208,6 +234,7 @@ async function classifyCached(url, threshold) {
         return nsfw;
     } catch (error) {
         console.warn('Image classification failed', error);
+        imageCache.set(url, false);
         return false;
     }
 }
@@ -217,10 +244,14 @@ async function classifyForTab(urls, sender) {
     const settings = await getSettings();
     const pageUrl = sender && sender.tab && sender.tab.url;
     const hostname = hostnameOf(pageUrl);
-    const list = [...new Set((urls || []).filter(url => typeof url === 'string' && /^https?:/i.test(url)))].slice(0, 12);
+    const list = [...new Set((urls || []).filter(url => typeof url === 'string' && (/^https?:/i.test(url) || url.startsWith('data:image/'))))].slice(0, 12);
 
     if (!settings.enabled || !settings.blurEnabled || isExcluded(hostname, settings.excludedSites)) {
         return { results: list.map(url => ({ url, nsfw: false })), skipped: true };
+    }
+
+    if (siteIsProtected(hostname, settings)) {
+        return { results: list.map(url => ({ url, nsfw: true })), listed: true };
     }
 
     const results = [];
@@ -231,11 +262,51 @@ async function classifyForTab(urls, sender) {
         results.push({ url, nsfw });
     }
 
-    if (anyNsfw && settings.autoDeleteHistory && pageUrl && /^https?:/i.test(pageUrl) && !isExcluded(hostname, settings.excludedSites)) {
+    if (anyNsfw && settings.autoDeleteHistory && pageUrl && /^https?:/i.test(pageUrl)) {
         await deleteHistoryUrl(pageUrl);
+        await bumpDeleted(1);
     }
 
     return { results };
+}
+
+async function collectHistoryItems(startTime) {
+    const seen = new Set();
+    const collected = [];
+
+    for (const text of HISTORY_SEARCH_QUERIES) {
+        let endTime = Date.now();
+        while (endTime > startTime) {
+            const chunkStart = Math.max(startTime, endTime - HISTORY_CHUNK_MS);
+            let pageEnd = endTime;
+
+            for (let page = 0; page < 40; page += 1) {
+                const items = await chromeCall(cb => chrome.history.search({
+                    text,
+                    startTime: chunkStart,
+                    endTime: pageEnd,
+                    maxResults: 1000
+                }, cb));
+                if (!items || !items.length) break;
+
+                let oldest = pageEnd;
+                for (const item of items) {
+                    if (item.lastVisitTime && item.lastVisitTime < oldest) oldest = item.lastVisitTime;
+                    if (!item.url || seen.has(item.url)) continue;
+                    seen.add(item.url);
+                    collected.push(item);
+                }
+
+                if (items.length < 1000) break;
+                pageEnd = oldest - 1;
+                if (pageEnd < chunkStart) break;
+            }
+
+            endTime = chunkStart - 1;
+        }
+    }
+
+    return collected;
 }
 
 async function clearMatchingHistory(range) {
@@ -243,46 +314,36 @@ async function clearMatchingHistory(range) {
     const settings = await getSettings();
     const cleanRange = normalizeCleanRange(range || settings.lastCleanRange);
     const startTime = historyStartTime(cleanRange);
-    let endTime = Date.now();
+    const items = await collectHistoryItems(startTime);
     let deleted = 0;
-    const seen = new Set();
 
-    while (endTime > startTime) {
-        const chunkStart = Math.max(startTime, endTime - HISTORY_CHUNK_MS);
-        let pageEnd = endTime;
-
-        for (let page = 0; page < 50; page += 1) {
-            const items = await chromeCall(cb => chrome.history.search({
-                text: '',
-                startTime: chunkStart,
-                endTime: pageEnd,
-                maxResults: 1000
-            }, cb));
-            if (!items || !items.length) break;
-
-            let oldest = pageEnd;
-            for (const item of items) {
-                if (item.lastVisitTime && item.lastVisitTime < oldest) oldest = item.lastVisitTime;
-                if (seen.has(item.url)) continue;
-                if (!shouldCleanHistoryItem(item, settings)) continue;
-                seen.add(item.url);
-                await deleteHistoryUrl(item.url);
-                deleted += 1;
-            }
-
-            if (items.length < 1000) break;
-            pageEnd = oldest - 1;
-            if (pageEnd < chunkStart) break;
+    for (const item of items) {
+        if (!shouldCleanHistoryItem(item, settings)) continue;
+        try {
+            await deleteHistoryUrl(item.url);
+            deleted += 1;
+        } catch (error) {
+            console.warn('Failed to delete', item.url, error);
         }
-
-        endTime = chunkStart - 1;
     }
 
+    await bumpDeleted(deleted);
     if (cleanRange !== settings.lastCleanRange) {
         await saveSettings({ lastCleanRange: cleanRange });
     }
 
     return deleted;
+}
+
+async function getSiteStatus(hostname) {
+    await bootBlocklist();
+    const settings = await getSettings();
+    const host = String(hostname || '').toLowerCase();
+    return {
+        ...settings,
+        listed: siteIsProtected(host, settings),
+        hostname: host
+    };
 }
 
 chrome.runtime.onConnect.addListener(port => {
@@ -315,6 +376,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (message.action === 'GET_SETTINGS') {
         getSettings().then(sendResponse).catch(error => sendResponse({ error: error.message }));
+        return true;
+    }
+
+    if (message.action === 'GET_SITE_STATUS') {
+        const hostname = message.hostname || (sender.tab && hostnameOf(sender.tab.url));
+        getSiteStatus(hostname).then(sendResponse).catch(error => sendResponse({ error: error.message }));
         return true;
     }
 

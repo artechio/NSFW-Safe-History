@@ -121,7 +121,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 showStatus('Could not clean history', 'error');
                 return;
             }
-            showStatus(`Removed ${response.deleted} history entries`, 'success');
+            const deleted = Number(response.deleted) || 0;
+            showStatus(
+                deleted > 0
+                    ? `Removed ${deleted} history entries`
+                    : 'No matching history left in that range',
+                'success'
+            );
         }).catch(() => showStatus('Could not clean history', 'error'))
             .finally(() => {
                 setBusy(false);
