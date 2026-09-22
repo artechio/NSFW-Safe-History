@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     versionBadge.textContent = `v${chrome.runtime.getManifest().version}`;
 
+    const rangeLabels = {
+        today: 'Clear today',
+        week: 'Clear this week',
+        month: 'Clear this month',
+        all: 'Clear all history'
+    };
+
     function sendMessage(message) {
         return new Promise((resolve, reject) => {
             chrome.runtime.sendMessage(message, response => {
@@ -26,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         status.textContent = message;
         status.className = `status-message status-${type}`;
         document.body.appendChild(status);
-        setTimeout(() => status.remove(), 3000);
+        setTimeout(() => status.remove(), 3500);
     }
 
     function setExcludeLabel(active) {
@@ -41,13 +48,14 @@ document.addEventListener('DOMContentLoaded', () => {
             button.classList.toggle('is-selected', button.dataset.range === range);
         });
         clearHistory.disabled = false;
-        const labels = {
-            today: 'Clear today',
-            week: 'Clear this week',
-            month: 'Clear this month',
-            all: 'Clear all history'
-        };
-        clearHistory.querySelector('span').textContent = labels[range] || 'Clear selected range';
+        clearHistory.querySelector('span').textContent = rangeLabels[range] || 'Clear selected range';
+    }
+
+    function setBusy(busy) {
+        clearHistory.disabled = busy;
+        rangeButtons.forEach(button => {
+            button.disabled = busy;
+        });
     }
 
     sendMessage({ action: 'GET_SETTINGS' }).then(settings => {
@@ -101,10 +109,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearHistory.addEventListener('click', () => {
         if (!selectedRange) return;
-        clearHistory.disabled = true;
-        rangeButtons.forEach(button => {
-            button.disabled = true;
-        });
+        if (selectedRange === 'all') {
+            const ok = window.confirm('Clear all matching history? This cannot be undone.');
+            if (!ok) return;
+        }
+
+        setBusy(true);
+        clearHistory.querySelector('span').textContent = 'Clearing…';
         sendMessage({ action: 'CLEAR_HISTORY', range: selectedRange }).then(response => {
             if (!response || !response.ok) {
                 showStatus('Could not clean history', 'error');
@@ -113,10 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showStatus(`Removed ${response.deleted} history entries`, 'success');
         }).catch(() => showStatus('Could not clean history', 'error'))
             .finally(() => {
-                clearHistory.disabled = false;
-                rangeButtons.forEach(button => {
-                    button.disabled = false;
-                });
+                setBusy(false);
                 setSelectedRange(selectedRange);
             });
     });
