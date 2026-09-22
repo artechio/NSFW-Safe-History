@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card"
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
@@ -45,17 +46,61 @@ export function OptionsApp() {
   const [customDomains, setCustomDomains] = useState("")
   const [excludedSites, setExcludedSites] = useState("")
 
+  function applySettings(response: ExtensionSettings & { error?: string }) {
+    if (response.error) throw new Error(response.error)
+    setSettings(response)
+    setCustomDomains((response.customDomains || []).join("\n"))
+    setExcludedSites((response.excludedSites || []).join("\n"))
+  }
+
   useEffect(() => {
     getSettings()
-      .then((response) => {
-        if (response.error) throw new Error(response.error)
-        setSettings(response)
-        setCustomDomains((response.customDomains || []).join("\n"))
-        setExcludedSites((response.excludedSites || []).join("\n"))
-      })
+      .then(applySettings)
       .catch(() => toast.error("Could not load settings"))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    function onStorageChanged(
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: string
+    ) {
+      if (area !== "sync") return
+      if (
+        !changes.blurEnabled &&
+        !changes.excludedSites &&
+        !changes.enabled &&
+        !changes.customDomains &&
+        !changes.autoDeleteHistory &&
+        !changes.blurIntensity &&
+        !changes.nsfwThreshold &&
+        !changes.lastBlocklistUpdate
+      ) {
+        return
+      }
+      getSettings()
+        .then(applySettings)
+        .catch(() => {})
+    }
+    chrome.storage.onChanged.addListener(onStorageChanged)
+    return () => chrome.storage.onChanged.removeListener(onStorageChanged)
+  }, [])
+
+  async function persistToggle(
+    patch: Partial<ExtensionSettings>,
+    nextLocal: ExtensionSettings
+  ) {
+    setSettings(nextLocal)
+    try {
+      const saved = await updateSettings(patch)
+      if (saved.error) throw new Error(saved.error)
+      setSettings(saved)
+    } catch {
+      toast.error("Could not save setting")
+      const latest = await getSettings().catch(() => null)
+      if (latest && !latest.error) applySettings(latest)
+    }
+  }
 
   async function onSave() {
     if (!settings) return
@@ -71,9 +116,7 @@ export function OptionsApp() {
         excludedSites: lines(excludedSites),
       })
       if (next.error) throw new Error(next.error)
-      setSettings(next)
-      setCustomDomains((next.customDomains || []).join("\n"))
-      setExcludedSites((next.excludedSites || []).join("\n"))
+      applySettings(next)
       toast.success("Settings saved")
     } catch {
       toast.error("Could not save settings")
@@ -89,7 +132,7 @@ export function OptionsApp() {
       if (!response?.ok) throw new Error("update failed")
       toast.success(`Domain list updated (${response.count} domains)`)
       const next = await getSettings()
-      setSettings(next)
+      applySettings(next)
     } catch {
       toast.error("Could not update the domain list")
     } finally {
@@ -131,54 +174,67 @@ export function OptionsApp() {
         <Card>
           <CardHeader>
             <CardTitle>Protection</CardTitle>
-            <CardDescription>Core switches for cleaning and blurring.</CardDescription>
+            <CardDescription>
+              These switches save immediately and stay in sync with the popup.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <FieldGroup>
-              <Field orientation="horizontal">
-                <div className="flex flex-col gap-1">
-                  <FieldLabel htmlFor="enabled">Enable protection</FieldLabel>
-                  <FieldDescription>Master switch for the extension.</FieldDescription>
-                </div>
+              <Field orientation="horizontal" className="justify-between gap-4">
+                <FieldContent className="min-w-0">
+                  <FieldLabel htmlFor="enabled">Protection</FieldLabel>
+                  <FieldDescription>
+                    Master switch for history cleaning and media blur.
+                  </FieldDescription>
+                </FieldContent>
                 <Switch
                   id="enabled"
+                  className="shrink-0"
                   checked={settings.enabled}
                   onCheckedChange={(checked) =>
-                    setSettings({ ...settings, enabled: checked })
+                    persistToggle({ enabled: checked }, { ...settings, enabled: checked })
                   }
                 />
               </Field>
 
-              <Field orientation="horizontal">
-                <div className="flex flex-col gap-1">
+              <Field orientation="horizontal" className="justify-between gap-4">
+                <FieldContent className="min-w-0">
                   <FieldLabel htmlFor="autoDeleteHistory">
-                    Delete matching history on visit
+                    Auto-clean history
                   </FieldLabel>
                   <FieldDescription>
-                    Remove listed or adult-titled pages as soon as they open.
+                    Remove listed or adult-titled pages from history as soon as they open.
                   </FieldDescription>
-                </div>
+                </FieldContent>
                 <Switch
                   id="autoDeleteHistory"
+                  className="shrink-0"
                   checked={settings.autoDeleteHistory}
                   onCheckedChange={(checked) =>
-                    setSettings({ ...settings, autoDeleteHistory: checked })
+                    persistToggle(
+                      { autoDeleteHistory: checked },
+                      { ...settings, autoDeleteHistory: checked }
+                    )
                   }
                 />
               </Field>
 
-              <Field orientation="horizontal">
-                <div className="flex flex-col gap-1">
-                  <FieldLabel htmlFor="blurEnabled">Blur adult media</FieldLabel>
+              <Field orientation="horizontal" className="justify-between gap-4">
+                <FieldContent className="min-w-0">
+                  <FieldLabel htmlFor="blurEnabled">Blur NSFW media</FieldLabel>
                   <FieldDescription>
-                    Includes images, videos, iframes, and ad backgrounds.
+                    Blur images, videos, iframes, and ad backgrounds marked as adult.
                   </FieldDescription>
-                </div>
+                </FieldContent>
                 <Switch
                   id="blurEnabled"
+                  className="shrink-0"
                   checked={settings.blurEnabled}
                   onCheckedChange={(checked) =>
-                    setSettings({ ...settings, blurEnabled: checked })
+                    persistToggle(
+                      { blurEnabled: checked },
+                      { ...settings, blurEnabled: checked }
+                    )
                   }
                 />
               </Field>

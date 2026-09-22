@@ -1,6 +1,6 @@
 {
   "name": "nsfw-safe-history",
-  "version": "2.0.8",
+  "version": "2.0.9",
   "description": "Chrome extension: clear adult sites from history on visit and blur NSFW images on-device",
   "main": "src/background.js",
   "scripts": {
