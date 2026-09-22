@@ -16,9 +16,9 @@ Classification runs in the browser. Image bytes are not uploaded. The only netwo
 
 ## Install from source
 
-1. `npm install`
+1. `npm install` and `npm install --prefix ext-ui`
 2. `npm test`
-3. `npm run build`
+3. `npm run build` (webpack core + Vite/React popup and options)
 4. Open `chrome://extensions`, enable Developer mode, and load the `dist` folder.
 
 `npm run update-blocklist` refreshes `assets/blocklist.txt` from the Steven Black porn-only hosts list. `npm run download-model` refreshes the bundled MobileNet weights in `assets/model/`. `npm run generate-icons` rebuilds the PNG icons from `assets/icon.svg`.
