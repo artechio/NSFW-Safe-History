@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,13 +29,40 @@ jobs:
         run: npm run build
 
       - name: Package extension
+        id: package
         run: |
           version=$(node -p "require('./manifest.json').version")
-          cd dist
-          zip -r "../nsfw-safe-history-${version}.zip" .
+          zip_name="nsfw-safe-history-${version}.zip"
+          (cd dist && zip -r "../${zip_name}" .)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "zip=${zip_name}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
           name: nsfw-safe-history
           path: nsfw-safe-history-*.zip
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ steps.package.outputs.version }}"
+          zip_name="${{ steps.package.outputs.zip }}"
+          tag="v${version}"
+          notes="$(cat <<EOF
+          Chrome extension build for version ${version}.
+
+          Download the zip, unzip it, open chrome://extensions, enable Developer mode, and Load unpacked on the extracted folder.
+          EOF
+          )"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$zip_name" --clobber
+            gh release edit "$tag" --title "NSFW Safe History v${version}" --notes "$notes" --latest
+          else
+            gh release create "$tag" "$zip_name" \
+              --title "NSFW Safe History v${version}" \
+              --notes "$notes" \
+              --latest
+          fi
