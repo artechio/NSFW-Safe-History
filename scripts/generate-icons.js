@@ -5,7 +5,7 @@ const sizes = [16, 32, 48, 128];
 const inputSvg = path.join(__dirname, '../assets/icon.svg');
 
 Promise.all(sizes.map(size =>
-    sharp(inputSvg)
+    sharp(inputSvg, { density: 384 })
         .resize(size, size)
         .png()
         .toFile(path.join(__dirname, `../assets/icon${size}.png`))

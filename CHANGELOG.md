@@ -2,6 +2,12 @@
 
 All notable changes to NSFW Safe History are documented here.
 
+## [2.0.10] — 2026-09-27
+
+### Changed
+- Package description no longer names other browsers, so store validation no longer warns about “chrome”
+- Extension icons replaced with the new mark at 16, 32, 48, and 128 px
+
 ## [2.0.9] — 2026-09-22
 
 ### Fixed
