@@ -60,7 +60,7 @@ Optional maintainers scripts:
 
 - `npm run update-blocklist` — refresh `assets/blocklist.txt` from the Steven Black porn-only hosts list  
 - `npm run download-model` — refresh bundled MobileNet weights in `assets/model/`  
-- `npm run generate-icons` — rebuild PNG icons from `assets/icon.svg`
+- `npm run generate-icons` — rebuild toolbar PNGs plus `assets/icons/light` and `assets/icons/dark` from `assets/icon.svg`
 
 ## Settings
 

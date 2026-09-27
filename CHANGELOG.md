@@ -6,7 +6,7 @@ All notable changes to NSFW Safe History are documented here.
 
 ### Changed
 - Package description no longer names other browsers, so store validation no longer warns about “chrome”
-- Extension icons replaced with the new mark at 16, 32, 48, and 128 px
+- Package icon is the broom mark. Toolbar PNGs are a universal white broom with a dark edge; `assets/icons/light` and `assets/icons/dark` are transparent light (`#111111`) and dark (`#FFFFFF`) sets. 16 and 32 are pixel-fit so the three bars stay separate
 
 ## [2.0.9] — 2026-09-22
 
