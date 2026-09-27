@@ -4,7 +4,6 @@ import {
   Delete02Icon,
   Loading03Icon,
   Settings02Icon,
-  ShieldKeyIcon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
@@ -40,7 +39,7 @@ export function PopupApp() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [host, setHost] = useState("")
-  const [filterSite, setFilterSite] = useState(true)
+  const [noHistory, setNoHistory] = useState(false)
   const [blurEnabled, setBlurEnabled] = useState(true)
   const [range, setRange] = useState<CleanRange>("week")
   const version = useMemo(() => chrome.runtime.getManifest().version, [])
@@ -52,7 +51,7 @@ export function PopupApp() {
         setHost(hostname)
         setBlurEnabled(Boolean(settings.blurEnabled))
         setRange(settings.lastCleanRange || "week")
-        setFilterSite(!(settings.excludedSites || []).includes(hostname))
+        setNoHistory((settings.customDomains || []).includes(hostname))
       })
       .catch(() => toast.error("Could not load settings"))
       .finally(() => setLoading(false))
@@ -67,24 +66,32 @@ export function PopupApp() {
       if (changes.blurEnabled && typeof changes.blurEnabled.newValue === "boolean") {
         setBlurEnabled(changes.blurEnabled.newValue)
       }
-      if (changes.excludedSites && host) {
-        const excluded = (changes.excludedSites.newValue as string[]) || []
-        setFilterSite(!excluded.includes(host))
+      if (changes.customDomains && host) {
+        const custom = (changes.customDomains.newValue as string[]) || []
+        setNoHistory(custom.includes(host))
       }
     }
     chrome.storage.onChanged.addListener(onStorageChanged)
     return () => chrome.storage.onChanged.removeListener(onStorageChanged)
   }, [host])
 
-  async function onFilterChange(checked: boolean) {
+  async function onNoHistoryChange(checked: boolean) {
     if (!host) return
-    setFilterSite(checked)
+    setNoHistory(checked)
     try {
       const settings = await getSettings()
+      const custom = new Set(settings.customDomains || [])
       const excluded = new Set(settings.excludedSites || [])
-      if (checked) excluded.delete(host)
-      else excluded.add(host)
-      await updateSettings({ excludedSites: [...excluded] })
+      if (checked) {
+        custom.add(host)
+        excluded.delete(host)
+      } else {
+        custom.delete(host)
+      }
+      await updateSettings({
+        customDomains: [...custom],
+        ...(checked ? { excludedSites: [...excluded] } : {}),
+      })
     } catch {
       toast.error("Could not update this site")
     }
@@ -137,15 +144,17 @@ export function PopupApp() {
     <div className="bg-background text-foreground relative w-[360px] overflow-hidden">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(ellipse_at_top,oklch(0.45_0.04_250/0.35),transparent_70%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(ellipse_at_top,oklch(0.85_0.16_128/0.4),transparent_70%)]"
       />
 
       <div className="relative flex flex-col gap-4 p-4">
         <header className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-xl shadow-sm">
-              <HugeiconsIcon icon={ShieldKeyIcon} />
-            </div>
+            <img
+              src={chrome.runtime.getURL("assets/icon128.png")}
+              alt=""
+              className="size-10 rounded-xl"
+            />
             <div className="flex min-w-0 flex-col gap-0.5">
               <h1 className="text-sm font-semibold tracking-tight">NSFW Safe History</h1>
               <p className="text-muted-foreground truncate text-xs">
@@ -158,17 +167,17 @@ export function PopupApp() {
 
         <Card size="sm">
           <CardHeader>
-            <CardTitle>Filter this site</CardTitle>
+            <CardTitle>No history for this site</CardTitle>
             <CardDescription>
-              {filterSite
-                ? "History cleaning and blur are on for this site"
-                : "This site is excluded"}
+              {noHistory
+                ? "Visits to this site won't be saved in your history."
+                : "Visits to this site stay in your history unless it's on the built-in adult list."}
             </CardDescription>
             <CardAction>
               <Switch
-                checked={filterSite}
+                checked={noHistory}
                 disabled={loading || !host}
-                onCheckedChange={onFilterChange}
+                onCheckedChange={onNoHistoryChange}
               />
             </CardAction>
           </CardHeader>
@@ -178,7 +187,9 @@ export function PopupApp() {
           <CardHeader>
             <CardTitle>Blur NSFW media</CardTitle>
             <CardDescription>
-              Blur images, videos, and ads marked as adult.
+              When on, NSFW images and video are blurred on every tab you open, on
+              this device. Sites on the adult list are blurred right away; other
+              sites are checked locally.
             </CardDescription>
             <CardAction>
               <Switch

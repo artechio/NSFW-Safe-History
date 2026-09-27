@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Loading03Icon, RefreshIcon, ShieldKeyIcon } from "@hugeicons/core-free-icons"
+import { Loading03Icon, RefreshIcon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -21,7 +21,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -152,19 +151,21 @@ export function OptionsApp() {
     <div className="bg-background text-foreground relative min-h-screen">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,oklch(0.45_0.04_250/0.28),transparent_72%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,oklch(0.85_0.16_128/0.35),transparent_72%)]"
       />
 
       <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-6 p-6 md:p-10">
         <header className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="bg-primary text-primary-foreground flex size-11 items-center justify-center rounded-xl shadow-sm">
-              <HugeiconsIcon icon={ShieldKeyIcon} />
-            </div>
+            <img
+              src={chrome.runtime.getURL("assets/icon128.png")}
+              alt=""
+              className="size-11 rounded-xl"
+            />
             <div className="flex flex-col gap-1.5">
               <h1 className="text-2xl font-semibold tracking-tight">NSFW Safe History</h1>
               <p className="text-muted-foreground text-sm">
-                Tune protection, blur strength, and the domain lists used for history cleaning.
+                Tune history cleaning, blur, and the domain lists.
               </p>
             </div>
           </div>
@@ -173,18 +174,15 @@ export function OptionsApp() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Protection</CardTitle>
-            <CardDescription>
-              These switches save immediately and stay in sync with the popup.
-            </CardDescription>
+            <CardTitle>Options</CardTitle>
           </CardHeader>
           <CardContent>
             <FieldGroup>
               <Field orientation="horizontal" className="justify-between gap-4">
                 <FieldContent className="min-w-0">
-                  <FieldLabel htmlFor="enabled">Protection</FieldLabel>
+                  <FieldLabel htmlFor="enabled">Extension on</FieldLabel>
                   <FieldDescription>
-                    Master switch for history cleaning and media blur.
+                    When this is off, history is left as it is and nothing is blurred.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -203,7 +201,8 @@ export function OptionsApp() {
                     Auto-clean history
                   </FieldLabel>
                   <FieldDescription>
-                    Remove listed or adult-titled pages from history as soon as they open.
+                    Removes visits that match the built-in adult list, your custom
+                    domains, or an obviously adult title. Other sites stay in history.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -218,13 +217,24 @@ export function OptionsApp() {
                   }
                 />
               </Field>
+            </FieldGroup>
+          </CardContent>
+        </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Blur NSFW media</CardTitle>
+            <CardDescription>
+              When on, NSFW images and video are blurred on every tab you open, on
+              this device. Sites on the adult list are blurred right away; other
+              sites are checked locally.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
               <Field orientation="horizontal" className="justify-between gap-4">
                 <FieldContent className="min-w-0">
                   <FieldLabel htmlFor="blurEnabled">Blur NSFW media</FieldLabel>
-                  <FieldDescription>
-                    Blur images, videos, iframes, and ad backgrounds marked as adult.
-                  </FieldDescription>
                 </FieldContent>
                 <Switch
                   id="blurEnabled"
@@ -238,8 +248,6 @@ export function OptionsApp() {
                   }
                 />
               </Field>
-
-              <Separator />
 
               <Field>
                 <FieldLabel htmlFor="blurIntensity">Blur strength (px)</FieldLabel>
@@ -277,7 +285,8 @@ export function OptionsApp() {
                   }
                 />
                 <FieldDescription>
-                  Higher values blur fewer borderline images.
+                  Higher values blur fewer borderline images. Only applies when blur
+                  is on.
                 </FieldDescription>
               </Field>
             </FieldGroup>
@@ -287,7 +296,10 @@ export function OptionsApp() {
         <Card>
           <CardHeader>
             <CardTitle>Custom domains</CardTitle>
-            <CardDescription>One domain per line. Visits are removed from history.</CardDescription>
+            <CardDescription>
+              One domain per line. Visits are removed from history. Sites you turn on
+              with No history for this site show up here.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
