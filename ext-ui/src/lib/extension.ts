@@ -62,19 +62,37 @@ export function updateBlocklist() {
   })
 }
 
-export function getActiveHostname(): Promise<string> {
+export type ActivePage = {
+  hostname: string
+  supported: boolean
+}
+
+function isFilterableUrl(url: string) {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
+export function getActivePage(): Promise<ActivePage> {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0]
-      if (!tab?.url) {
-        resolve("")
+      if (!tab?.url || !isFilterableUrl(tab.url)) {
+        resolve({ hostname: "", supported: false })
         return
       }
       try {
-        resolve(new URL(tab.url).hostname)
+        resolve({ hostname: new URL(tab.url).hostname, supported: true })
       } catch {
-        resolve("")
+        resolve({ hostname: "", supported: false })
       }
     })
   })
+}
+
+export function getActiveHostname(): Promise<string> {
+  return getActivePage().then((page) => page.hostname)
 }

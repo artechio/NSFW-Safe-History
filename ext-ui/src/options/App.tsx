@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Loading03Icon, RefreshIcon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import { FooterLinks } from "@/components/footer-links"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -58,6 +60,7 @@ export function OptionsApp() {
   const [settings, setSettings] = useState<ExtensionSettings | null>(null)
   const [customDomains, setCustomDomains] = useState("")
   const [excludedSites, setExcludedSites] = useState("")
+  const version = useMemo(() => chrome.runtime.getManifest().version, [])
 
   function applySettings(response: ExtensionSettings & { error?: string }) {
     if (response.error) throw new Error(response.error)
@@ -161,33 +164,37 @@ export function OptionsApp() {
     )
   }
 
-  return (
-    <div className="bg-background text-foreground relative min-h-screen">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,oklch(0.85_0.16_128/0.35),transparent_72%)]"
-      />
+  const blurControlsDisabled = !settings.blurEnabled
 
-      <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-6 p-6 md:p-10">
-        <header className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
+  return (
+    <div className="bg-background text-foreground min-h-screen">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-5 md:p-8">
+        <header className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             <img
               src={chrome.runtime.getURL("assets/icon128.png")}
               alt=""
-              className="size-11 rounded-xl"
+              className="size-9 rounded-lg"
             />
-            <div className="flex flex-col gap-1.5">
-              <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-              <p className="text-muted-foreground text-sm">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h1 className="text-lg font-semibold tracking-tight">
+                NSFW Safe History
+              </h1>
+              <p className="text-muted-foreground text-xs leading-snug">
                 Control which sites appear in your history and when to blur adult
                 content.
               </p>
             </div>
           </div>
-          <Badge variant="secondary">v{chrome.runtime.getManifest().version}</Badge>
+          <Badge
+            variant="outline"
+            className="border-transparent bg-transparent px-1.5 text-[10px] font-normal text-muted-foreground"
+          >
+            v{version}
+          </Badge>
         </header>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
             <CardTitle>General</CardTitle>
           </CardHeader>
@@ -216,8 +223,8 @@ export function OptionsApp() {
                     Automatically remove matching visits
                   </FieldLabel>
                   <FieldDescription>
-                    Remove visits to sites on the adult-site list and sites you add.
-                    Other visits stay in your history.
+                    Remove visits to adult-list and added sites. Other visits stay
+                    in your history.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -236,38 +243,32 @@ export function OptionsApp() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
-            <CardTitle>Adult content blurring</CardTitle>
+            <CardTitle>Blur adult images and videos</CardTitle>
             <CardDescription>
-              Media on listed adult sites is blurred immediately. Media on other
-              sites is checked on your device.
+              Listed adult sites blur immediately. Other sites are checked on your
+              device. Includes media ads.
             </CardDescription>
+            <CardAction>
+              <Switch
+                id="blurEnabled"
+                checked={settings.blurEnabled}
+                onCheckedChange={(checked) =>
+                  persistToggle(
+                    { blurEnabled: checked },
+                    { ...settings, blurEnabled: checked }
+                  )
+                }
+              />
+            </CardAction>
           </CardHeader>
           <CardContent>
-            <FieldGroup>
-              <Field orientation="horizontal" className="justify-between gap-4">
-                <FieldContent className="min-w-0">
-                  <FieldLabel htmlFor="blurEnabled">
-                    Blur adult images and videos
-                  </FieldLabel>
-                  <FieldDescription>
-                    Includes media ads. Off by default.
-                  </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id="blurEnabled"
-                  className="shrink-0"
-                  checked={settings.blurEnabled}
-                  onCheckedChange={(checked) =>
-                    persistToggle(
-                      { blurEnabled: checked },
-                      { ...settings, blurEnabled: checked }
-                    )
-                  }
-                />
-              </Field>
-
+            <FieldGroup
+              className={
+                blurControlsDisabled ? "pointer-events-none opacity-45" : undefined
+              }
+            >
               <Field>
                 <FieldLabel htmlFor="blurIntensity">Blur strength (px)</FieldLabel>
                 <Input
@@ -275,6 +276,7 @@ export function OptionsApp() {
                   type="number"
                   min={5}
                   max={40}
+                  disabled={blurControlsDisabled}
                   value={settings.blurIntensity}
                   onChange={(event) =>
                     setSettings({
@@ -296,6 +298,7 @@ export function OptionsApp() {
                   min={0.5}
                   max={0.95}
                   step={0.05}
+                  disabled={blurControlsDisabled}
                   value={settings.nsfwThreshold}
                   onChange={(event) =>
                     setSettings({
@@ -305,53 +308,53 @@ export function OptionsApp() {
                   }
                 />
                 <FieldDescription>
-                  Higher values require more confidence before blurring an image.
-                  Range: 0.50–0.95.
+                  Higher values need more confidence before blurring. Range:
+                  0.50–0.95.
                 </FieldDescription>
               </Field>
             </FieldGroup>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
             <CardTitle>Additional sites to filter</CardTitle>
             <CardDescription>
-              Apply filtering to these sites, even if they aren’t on the adult-site
-              list. Enter one domain per line.
+              Apply filtering even if these sites aren’t on the adult-site list.
+              Enter one domain per line.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
               value={customDomains}
               onChange={(event) => setCustomDomains(event.target.value)}
-              rows={6}
+              rows={5}
               spellCheck={false}
               placeholder="example.com"
             />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
             <CardTitle>Exceptions to the adult-site list</CardTitle>
             <CardDescription>
-              Skip filtering for these sites on the adult-site list. Enter one
-              hostname per line.
+              Skip filtering for these adult-list sites. Enter one hostname per
+              line.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
               value={excludedSites}
               onChange={(event) => setExcludedSites(event.target.value)}
-              rows={6}
+              rows={5}
               spellCheck={false}
               placeholder="adult.example.com"
             />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
             <CardTitle>Adult-site list</CardTitle>
             <CardDescription>
@@ -389,6 +392,8 @@ export function OptionsApp() {
             </Button>
           </CardFooter>
         </Card>
+
+        <FooterLinks className="pb-1" />
       </div>
     </div>
   )

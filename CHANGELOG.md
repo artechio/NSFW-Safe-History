@@ -13,6 +13,7 @@ All notable changes to NSFW Safe History are documented here.
 ### Changed
 - Blur NSFW media defaults to off
 - Options and popup copy clarified (Settings, Filter this site, blur, remove matching visits)
+- Popup/options UI tightened: quieter accents, footer support links, clearer period selection
 - Options: Additional sites to filter / Exceptions to the adult-site list
 - GitHub Release title is the version only; notes describe Chromium browsers such as Edge
 - README links the Microsoft Edge Add-ons listing

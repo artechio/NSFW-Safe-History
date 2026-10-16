@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import { FooterLinks } from "@/components/footer-links"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,7 +23,7 @@ import { Switch } from "@/components/ui/switch"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   clearHistory,
-  getActiveHostname,
+  getActivePage,
   getSiteStatus,
   getSettings,
   updateSettings,
@@ -33,6 +34,7 @@ export function PopupApp() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [host, setHost] = useState("")
+  const [pageSupported, setPageSupported] = useState(false)
   const [enabled, setEnabled] = useState(true)
   const [filterSite, setFilterSite] = useState(false)
   const [inBlocklist, setInBlocklist] = useState(false)
@@ -41,19 +43,20 @@ export function PopupApp() {
   const version = useMemo(() => chrome.runtime.getManifest().version, [])
 
   useEffect(() => {
-    Promise.all([getSettings(), getActiveHostname()])
-      .then(async ([settings, hostname]) => {
+    Promise.all([getSettings(), getActivePage()])
+      .then(async ([settings, page]) => {
         if (settings.error) throw new Error(settings.error)
-        setHost(hostname)
+        setHost(page.hostname)
+        setPageSupported(page.supported)
         setEnabled(Boolean(settings.enabled))
         setBlurEnabled(Boolean(settings.blurEnabled))
         setRange(settings.lastCleanRange || "week")
-        if (!hostname) {
+        if (!page.supported || !page.hostname) {
           setFilterSite(false)
           setInBlocklist(false)
           return
         }
-        const status = await getSiteStatus(hostname)
+        const status = await getSiteStatus(page.hostname)
         if (status.error) throw new Error(status.error)
         setFilterSite(Boolean(status.filterActive))
         setInBlocklist(Boolean(status.inBlocklist))
@@ -89,7 +92,7 @@ export function PopupApp() {
   }, [host])
 
   async function onFilterChange(checked: boolean) {
-    if (!host) return
+    if (!host || !pageSupported) return
     setFilterSite(checked)
     try {
       const settings = await getSettings()
@@ -164,62 +167,70 @@ export function PopupApp() {
     }
   }
 
-  return (
-    <div className="bg-background text-foreground relative w-[360px] overflow-hidden">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(ellipse_at_top,oklch(0.85_0.16_128/0.4),transparent_70%)]"
-      />
+  const siteLabel = pageSupported
+    ? host
+    : "Filtering isn’t available on this page."
 
-      <div className="relative flex flex-col gap-4 p-4">
-        <header className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
+  return (
+    <div className="bg-background text-foreground w-[360px]">
+      <div className="flex flex-col gap-3 p-3">
+        <header className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
             <img
               src={chrome.runtime.getURL("assets/icon128.png")}
               alt=""
-              className="size-10 rounded-xl"
+              className="size-8 rounded-lg"
             />
             <div className="flex min-w-0 flex-col gap-0.5">
-              <h1 className="text-sm font-semibold tracking-tight">NSFW Safe History</h1>
-              <p className="text-muted-foreground truncate text-xs">
-                {host || "No active site"}
+              <h1 className="truncate text-sm font-semibold tracking-tight">
+                NSFW Safe History
+              </h1>
+              <p
+                className="text-muted-foreground truncate text-[11px] leading-snug"
+                title={pageSupported ? host : undefined}
+              >
+                {loading ? "…" : siteLabel}
               </p>
             </div>
           </div>
-          <Badge variant="secondary">v{version}</Badge>
+          <Badge
+            variant="outline"
+            className="border-transparent bg-transparent px-1.5 text-[10px] font-normal text-muted-foreground"
+          >
+            v{version}
+          </Badge>
         </header>
 
         {!enabled && !loading ? (
-          <p className="text-muted-foreground text-xs leading-relaxed">
+          <p className="text-muted-foreground text-[11px] leading-snug">
             Extension is off. Automatic history removal and media blurring are
             paused.
           </p>
         ) : null}
 
-        <Card size="sm">
-          <CardHeader>
+        <Card size="sm" className="gap-0 py-2.5">
+          <CardHeader className="gap-0.5">
             <CardTitle>Filter this site</CardTitle>
             <CardDescription>
               {filterSite
-                ? "This site is included in filtering. Your history and blur settings apply."
-                : "This site is excluded from filtering. Its visits stay in your history."}
+                ? "Included in filtering. History and blur settings apply."
+                : "Excluded from filtering. Visits stay in your history."}
             </CardDescription>
             <CardAction>
               <Switch
                 checked={filterSite}
-                disabled={loading || !host || !enabled}
+                disabled={loading || !pageSupported || !enabled}
                 onCheckedChange={onFilterChange}
               />
             </CardAction>
           </CardHeader>
         </Card>
 
-        <Card size="sm">
-          <CardHeader>
+        <Card size="sm" className="gap-0 py-2.5">
+          <CardHeader className="gap-0.5">
             <CardTitle>Blur adult images and videos</CardTitle>
             <CardDescription>
-              Blur detected adult media, including ads. Detection runs on your
-              device.
+              Blurs detected adult media, including ads, on your device.
             </CardDescription>
             <CardAction>
               <Switch
@@ -231,15 +242,15 @@ export function PopupApp() {
           </CardHeader>
         </Card>
 
-        <Card size="sm">
-          <CardHeader>
+        <Card size="sm" className="gap-2 py-2.5">
+          <CardHeader className="gap-0.5">
             <CardTitle>Remove matching visits</CardTitle>
             <CardDescription>
               Remove visits to filtered sites from the selected period. Other
               visits stay in your history.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+          <CardContent className="flex flex-col gap-2.5">
             <ToggleGroup
               type="single"
               variant="outline"
@@ -288,14 +299,17 @@ export function PopupApp() {
 
         <Separator />
 
-        <Button
-          variant="ghost"
-          className="w-full"
-          onClick={() => chrome.runtime.openOptionsPage()}
-        >
-          <HugeiconsIcon icon={Settings02Icon} data-icon="inline-start" />
-          Settings
-        </Button>
+        <div className="flex flex-col gap-1">
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => chrome.runtime.openOptionsPage()}
+          >
+            <HugeiconsIcon icon={Settings02Icon} data-icon="inline-start" />
+            Settings
+          </Button>
+          <FooterLinks className="px-1" />
+        </div>
       </div>
     </div>
   )
