@@ -37,6 +37,20 @@ function lines(value: string) {
     .filter(Boolean)
 }
 
+function formatLastUpdated(timestamp: number) {
+  const date = new Date(timestamp)
+  const datePart = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+  const timePart = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  return `Last updated: ${datePart} at ${timePart}`
+}
+
 export function OptionsApp() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -129,11 +143,11 @@ export function OptionsApp() {
     try {
       const response = await updateBlocklist()
       if (!response?.ok) throw new Error("update failed")
-      toast.success(`Domain list updated (${response.count} domains)`)
+      toast.success(`Adult-site list updated (${response.count} domains)`)
       const next = await getSettings()
       applySettings(next)
     } catch {
-      toast.error("Could not update the domain list")
+      toast.error("Could not update the adult-site list")
     } finally {
       setUpdatingList(false)
     }
@@ -163,9 +177,10 @@ export function OptionsApp() {
               className="size-11 rounded-xl"
             />
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-2xl font-semibold tracking-tight">NSFW Safe History</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
               <p className="text-muted-foreground text-sm">
-                Tune history cleaning, blur, and the domain lists.
+                Control which sites appear in your history and when to blur adult
+                content.
               </p>
             </div>
           </div>
@@ -174,15 +189,15 @@ export function OptionsApp() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Options</CardTitle>
+            <CardTitle>General</CardTitle>
           </CardHeader>
           <CardContent>
             <FieldGroup>
               <Field orientation="horizontal" className="justify-between gap-4">
                 <FieldContent className="min-w-0">
-                  <FieldLabel htmlFor="enabled">Extension on</FieldLabel>
+                  <FieldLabel htmlFor="enabled">Enable extension</FieldLabel>
                   <FieldDescription>
-                    When this is off, history is left as it is and nothing is blurred.
+                    Turn off to pause automatic history removal and media blurring.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -198,11 +213,11 @@ export function OptionsApp() {
               <Field orientation="horizontal" className="justify-between gap-4">
                 <FieldContent className="min-w-0">
                   <FieldLabel htmlFor="autoDeleteHistory">
-                    Auto-clean history
+                    Automatically remove matching visits
                   </FieldLabel>
                   <FieldDescription>
-                    Removes visits that match the built-in adult list or your
-                    included sites. Other sites stay in history.
+                    Remove visits to sites on the adult-site list and sites you add.
+                    Other visits stay in your history.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -223,18 +238,22 @@ export function OptionsApp() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Blur NSFW media</CardTitle>
+            <CardTitle>Adult content blurring</CardTitle>
             <CardDescription>
-              Off by default. When on, only images, video, and media ads are
-              blurred on this device. Sites on the adult list blur right away;
-              other sites are checked locally.
+              Media on listed adult sites is blurred immediately. Media on other
+              sites is checked on your device.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <FieldGroup>
               <Field orientation="horizontal" className="justify-between gap-4">
                 <FieldContent className="min-w-0">
-                  <FieldLabel htmlFor="blurEnabled">Blur NSFW media</FieldLabel>
+                  <FieldLabel htmlFor="blurEnabled">
+                    Blur adult images and videos
+                  </FieldLabel>
+                  <FieldDescription>
+                    Includes media ads. Off by default.
+                  </FieldDescription>
                 </FieldContent>
                 <Switch
                   id="blurEnabled"
@@ -264,12 +283,13 @@ export function OptionsApp() {
                     })
                   }
                 />
+                <FieldDescription>
+                  Higher values create a stronger blur.
+                </FieldDescription>
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="nsfwThreshold">
-                  Detection threshold (0.50–0.95)
-                </FieldLabel>
+                <FieldLabel htmlFor="nsfwThreshold">Detection threshold</FieldLabel>
                 <Input
                   id="nsfwThreshold"
                   type="number"
@@ -285,8 +305,8 @@ export function OptionsApp() {
                   }
                 />
                 <FieldDescription>
-                  Higher values blur fewer borderline images. Only applies when blur
-                  is on.
+                  Higher values require more confidence before blurring an image.
+                  Range: 0.50–0.95.
                 </FieldDescription>
               </Field>
             </FieldGroup>
@@ -295,11 +315,10 @@ export function OptionsApp() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Included sites</CardTitle>
+            <CardTitle>Additional sites to filter</CardTitle>
             <CardDescription>
-              One domain per line. Sites you add here (not in the NSFW list) are
-              filtered like adult hosts. Turning on Filter this site for a normal
-              site adds it here.
+              Apply filtering to these sites, even if they aren’t on the adult-site
+              list. Enter one domain per line.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -308,17 +327,17 @@ export function OptionsApp() {
               onChange={(event) => setCustomDomains(event.target.value)}
               rows={6}
               spellCheck={false}
-              placeholder={"example.com\ncdn.example.com"}
+              placeholder="example.com"
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Excluded sites</CardTitle>
+            <CardTitle>Exceptions to the adult-site list</CardTitle>
             <CardDescription>
-              One hostname per line. Only for NSFW-list sites you want left alone.
-              Turning off Filter this site on an adult host adds it here.
+              Skip filtering for these sites on the adult-site list. Enter one
+              hostname per line.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -334,11 +353,11 @@ export function OptionsApp() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Domain list</CardTitle>
+            <CardTitle>Adult-site list</CardTitle>
             <CardDescription>
               {settings.lastBlocklistUpdate
-                ? `Last updated ${new Date(settings.lastBlocklistUpdate).toLocaleString()}.`
-                : "The built-in adult-domain list updates weekly."}
+                ? formatLastUpdated(settings.lastBlocklistUpdate)
+                : "Updates weekly."}
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex-wrap justify-between gap-3">
@@ -356,7 +375,7 @@ export function OptionsApp() {
               ) : (
                 <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" />
               )}
-              Update domain list now
+              Update adult-site list
             </Button>
             <Button disabled={saving} onClick={onSave}>
               {saving ? (

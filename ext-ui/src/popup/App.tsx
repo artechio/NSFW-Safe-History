@@ -29,17 +29,11 @@ import {
   type CleanRange,
 } from "@/lib/extension"
 
-const RANGE_LABELS: Record<CleanRange, string> = {
-  today: "Clear today",
-  week: "Clear this week",
-  month: "Clear this month",
-  all: "Clear all history",
-}
-
 export function PopupApp() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [host, setHost] = useState("")
+  const [enabled, setEnabled] = useState(true)
   const [filterSite, setFilterSite] = useState(false)
   const [inBlocklist, setInBlocklist] = useState(false)
   const [blurEnabled, setBlurEnabled] = useState(false)
@@ -51,6 +45,7 @@ export function PopupApp() {
       .then(async ([settings, hostname]) => {
         if (settings.error) throw new Error(settings.error)
         setHost(hostname)
+        setEnabled(Boolean(settings.enabled))
         setBlurEnabled(Boolean(settings.blurEnabled))
         setRange(settings.lastCleanRange || "week")
         if (!hostname) {
@@ -73,13 +68,13 @@ export function PopupApp() {
       area: string
     ) {
       if (area !== "sync") return
+      if (changes.enabled && typeof changes.enabled.newValue === "boolean") {
+        setEnabled(changes.enabled.newValue)
+      }
       if (changes.blurEnabled && typeof changes.blurEnabled.newValue === "boolean") {
         setBlurEnabled(changes.blurEnabled.newValue)
       }
-      if (
-        host &&
-        (changes.customDomains || changes.excludedSites)
-      ) {
+      if (host && (changes.customDomains || changes.excludedSites)) {
         getSiteStatus(host)
           .then((status) => {
             if (status.error) return
@@ -132,9 +127,16 @@ export function PopupApp() {
     }
   }
 
+  function reportClearResult(deleted: number) {
+    if (deleted > 0) toast.success("Matching visits removed.")
+    else toast.message("No matching visits found for this period.")
+  }
+
   async function onClear() {
     if (range === "all") {
-      const ok = window.confirm("Clear all matching history? This cannot be undone.")
+      const ok = window.confirm(
+        "Remove matching visits from all time? This cannot be undone."
+      )
       if (!ok) return
     }
 
@@ -142,25 +144,21 @@ export function PopupApp() {
     try {
       const response = await clearHistory(range)
       if (!response?.ok) {
-        toast.error("Could not clean history")
+        toast.error("Couldn’t remove matching visits. Try again.")
         return
       }
-      const deleted = Number(response.deleted) || 0
-      if (deleted > 0) toast.success(`Removed ${deleted} history entries`)
-      else toast.message("No matching history left in that range")
+      reportClearResult(Number(response.deleted) || 0)
     } catch {
       try {
         const data = await chrome.storage.session.get(["lastClearDeleted", "lastClearAt"])
         if (data.lastClearAt && Date.now() - Number(data.lastClearAt) < 15000) {
-          const deleted = Number(data.lastClearDeleted) || 0
-          if (deleted > 0) toast.success(`Removed ${deleted} history entries`)
-          else toast.message("No matching history left in that range")
+          reportClearResult(Number(data.lastClearDeleted) || 0)
           return
         }
       } catch {
         // ignore
       }
-      toast.error("Could not clean history")
+      toast.error("Couldn’t remove matching visits. Try again.")
     } finally {
       setBusy(false)
     }
@@ -191,18 +189,25 @@ export function PopupApp() {
           <Badge variant="secondary">v{version}</Badge>
         </header>
 
+        {!enabled && !loading ? (
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Extension is off. Automatic history removal and media blurring are
+            paused.
+          </p>
+        ) : null}
+
         <Card size="sm">
           <CardHeader>
             <CardTitle>Filter this site</CardTitle>
             <CardDescription>
               {filterSite
-                ? "Visits to this site are removed from history."
-                : "This site is left alone. History is not cleared."}
+                ? "This site is included in filtering. Your history and blur settings apply."
+                : "This site is excluded from filtering. Its visits stay in your history."}
             </CardDescription>
             <CardAction>
               <Switch
                 checked={filterSite}
-                disabled={loading || !host}
+                disabled={loading || !host || !enabled}
                 onCheckedChange={onFilterChange}
               />
             </CardAction>
@@ -211,15 +216,15 @@ export function PopupApp() {
 
         <Card size="sm">
           <CardHeader>
-            <CardTitle>Blur NSFW media</CardTitle>
+            <CardTitle>Blur adult images and videos</CardTitle>
             <CardDescription>
-              When on, NSFW images, video, and media ads are blurred on this
-              device. Off by default.
+              Blur detected adult media, including ads. Detection runs on your
+              device.
             </CardDescription>
             <CardAction>
               <Switch
                 checked={blurEnabled}
-                disabled={loading}
+                disabled={loading || !enabled}
                 onCheckedChange={onBlurChange}
               />
             </CardAction>
@@ -228,8 +233,11 @@ export function PopupApp() {
 
         <Card size="sm">
           <CardHeader>
-            <CardTitle>Clear matching history</CardTitle>
-            <CardDescription>Choose a period, then clear.</CardDescription>
+            <CardTitle>Remove matching visits</CardTitle>
+            <CardDescription>
+              Remove visits to filtered sites from the selected period. Other
+              visits stay in your history.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <ToggleGroup
@@ -242,7 +250,7 @@ export function PopupApp() {
                 if (value) setRange(value as CleanRange)
               }}
               className="grid w-full grid-cols-2"
-              disabled={busy || loading}
+              disabled={busy || loading || !enabled}
             >
               <ToggleGroupItem value="today" className="w-full">
                 Today
@@ -254,14 +262,14 @@ export function PopupApp() {
                 This month
               </ToggleGroupItem>
               <ToggleGroupItem value="all" className="w-full">
-                All history
+                All time
               </ToggleGroupItem>
             </ToggleGroup>
 
             <Button
               variant="destructive"
               className="w-full"
-              disabled={busy || loading}
+              disabled={busy || loading || !enabled}
               onClick={onClear}
             >
               {busy ? (
@@ -273,7 +281,7 @@ export function PopupApp() {
               ) : (
                 <HugeiconsIcon icon={Delete02Icon} data-icon="inline-start" />
               )}
-              {busy ? "Clearing…" : RANGE_LABELS[range]}
+              {busy ? "Removing matching visits…" : "Remove matching visits"}
             </Button>
           </CardContent>
         </Card>
@@ -286,7 +294,7 @@ export function PopupApp() {
           onClick={() => chrome.runtime.openOptionsPage()}
         >
           <HugeiconsIcon icon={Settings02Icon} data-icon="inline-start" />
-          Advanced settings
+          Settings
         </Button>
       </div>
     </div>
