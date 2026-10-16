@@ -223,8 +223,8 @@ export function OptionsApp() {
                     Automatically remove matching visits
                   </FieldLabel>
                   <FieldDescription>
-                    Remove visits to adult-list and added sites. Other visits stay
-                    in your history.
+                    Remove visits to sites on the adult-site list and sites you
+                    add. Other visits stay in your history.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -247,8 +247,8 @@ export function OptionsApp() {
           <CardHeader>
             <CardTitle>Blur adult images and videos</CardTitle>
             <CardDescription>
-              Listed adult sites blur immediately. Other sites are checked on your
-              device. Includes media ads.
+              Images and videos on listed adult sites are blurred immediately.
+              Other sites are checked on your device. Includes media ads.
             </CardDescription>
             <CardAction>
               <Switch
@@ -266,8 +266,9 @@ export function OptionsApp() {
           <CardContent>
             <FieldGroup
               className={
-                blurControlsDisabled ? "pointer-events-none opacity-45" : undefined
+                blurControlsDisabled ? "pointer-events-none" : undefined
               }
+              aria-disabled={blurControlsDisabled || undefined}
             >
               <Field>
                 <FieldLabel htmlFor="blurIntensity">Blur strength (px)</FieldLabel>
@@ -277,6 +278,7 @@ export function OptionsApp() {
                   min={5}
                   max={40}
                   disabled={blurControlsDisabled}
+                  className={blurControlsDisabled ? "opacity-60" : undefined}
                   value={settings.blurIntensity}
                   onChange={(event) =>
                     setSettings({
@@ -299,6 +301,7 @@ export function OptionsApp() {
                   max={0.95}
                   step={0.05}
                   disabled={blurControlsDisabled}
+                  className={blurControlsDisabled ? "opacity-60" : undefined}
                   value={settings.nsfwThreshold}
                   onChange={(event) =>
                     setSettings({
@@ -363,7 +366,7 @@ export function OptionsApp() {
                 : "Updates weekly."}
             </CardDescription>
           </CardHeader>
-          <CardFooter className="flex-wrap justify-between gap-3">
+          <CardFooter>
             <Button
               variant="outline"
               disabled={updatingList}
@@ -380,18 +383,21 @@ export function OptionsApp() {
               )}
               Update adult-site list
             </Button>
-            <Button disabled={saving} onClick={onSave}>
-              {saving ? (
-                <HugeiconsIcon
-                  icon={Loading03Icon}
-                  data-icon="inline-start"
-                  className="animate-spin"
-                />
-              ) : null}
-              Save settings
-            </Button>
           </CardFooter>
         </Card>
+
+        <div className="flex justify-end">
+          <Button disabled={saving} onClick={onSave}>
+            {saving ? (
+              <HugeiconsIcon
+                icon={Loading03Icon}
+                data-icon="inline-start"
+                className="animate-spin"
+              />
+            ) : null}
+            Save settings
+          </Button>
+        </div>
 
         <FooterLinks className="pb-1" />
       </div>

@@ -171,6 +171,12 @@ export function PopupApp() {
     ? host
     : "Filtering isn’t available on this page."
 
+  const filterDescription = !pageSupported
+    ? "Open a website to change its filtering settings."
+    : filterSite
+      ? "Included in filtering. History and blur settings apply."
+      : "Excluded from filtering. Visits stay in your history."
+
   return (
     <div className="bg-background text-foreground w-[360px]">
       <div className="flex flex-col gap-3 p-3">
@@ -211,14 +217,10 @@ export function PopupApp() {
         <Card size="sm" className="gap-0 py-2.5">
           <CardHeader className="gap-0.5">
             <CardTitle>Filter this site</CardTitle>
-            <CardDescription>
-              {filterSite
-                ? "Included in filtering. History and blur settings apply."
-                : "Excluded from filtering. Visits stay in your history."}
-            </CardDescription>
+            <CardDescription>{filterDescription}</CardDescription>
             <CardAction>
               <Switch
-                checked={filterSite}
+                checked={pageSupported ? filterSite : false}
                 disabled={loading || !pageSupported || !enabled}
                 onCheckedChange={onFilterChange}
               />
