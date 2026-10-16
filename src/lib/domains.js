@@ -47,8 +47,11 @@ function hostMatches(hostname, domainSet) {
 }
 
 function isExcluded(hostname, excludedSites) {
-    const host = String(hostname || '').trim().toLowerCase();
-    return (excludedSites || []).some(site => site === host);
+    if (!excludedSites || !excludedSites.length) return false;
+    const excludedSet = excludedSites instanceof Set
+        ? excludedSites
+        : new Set(excludedSites);
+    return hostMatches(hostname, excludedSet);
 }
 
 module.exports = {

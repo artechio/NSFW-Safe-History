@@ -201,8 +201,8 @@ export function OptionsApp() {
                     Auto-clean history
                   </FieldLabel>
                   <FieldDescription>
-                    Removes visits that match the built-in adult list, your custom
-                    domains, or an obviously adult title. Other sites stay in history.
+                    Removes visits that match the built-in adult list or your
+                    included sites. Other sites stay in history.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -225,9 +225,9 @@ export function OptionsApp() {
           <CardHeader>
             <CardTitle>Blur NSFW media</CardTitle>
             <CardDescription>
-              When on, NSFW images and video are blurred on every tab you open, on
-              this device. Sites on the adult list are blurred right away; other
-              sites are checked locally.
+              Off by default. When on, only images, video, and media ads are
+              blurred on this device. Sites on the adult list blur right away;
+              other sites are checked locally.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -295,10 +295,11 @@ export function OptionsApp() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Custom domains</CardTitle>
+            <CardTitle>Included sites</CardTitle>
             <CardDescription>
-              One domain per line. Visits are removed from history. Sites you turn on
-              with No history for this site show up here.
+              One domain per line. Sites you add here (not in the NSFW list) are
+              filtered like adult hosts. Turning on Filter this site for a normal
+              site adds it here.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -315,7 +316,10 @@ export function OptionsApp() {
         <Card>
           <CardHeader>
             <CardTitle>Excluded sites</CardTitle>
-            <CardDescription>One hostname per line. These sites stay untouched.</CardDescription>
+            <CardDescription>
+              One hostname per line. Only for NSFW-list sites you want left alone.
+              Turning off Filter this site on an adult host adds it here.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -323,7 +327,7 @@ export function OptionsApp() {
               onChange={(event) => setExcludedSites(event.target.value)}
               rows={6}
               spellCheck={false}
-              placeholder="news.example.com"
+              placeholder="adult.example.com"
             />
           </CardContent>
         </Card>

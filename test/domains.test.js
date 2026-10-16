@@ -28,7 +28,8 @@ test('normalizeDomain rejects bare labels and addresses', () => {
     assert.equal(normalizeDomain('*.Adult.Example.'), 'adult.example');
 });
 
-test('isExcluded matches the full hostname', () => {
+test('isExcluded matches the hostname and its parents', () => {
     assert.equal(isExcluded('news.example', ['news.example']), true);
-    assert.equal(isExcluded('www.news.example', ['news.example']), false);
+    assert.equal(isExcluded('www.news.example', ['news.example']), true);
+    assert.equal(isExcluded('other.example', ['news.example']), false);
 });

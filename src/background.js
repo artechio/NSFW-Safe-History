@@ -2,7 +2,6 @@ const { parseHosts, hostMatches, isExcluded, BLOCKLIST_URL, BLOCKLIST_INTERVAL_M
 const { normalizeSettings, historyStartTime, normalizeCleanRange } = require('./lib/settings');
 const { isNsfwPrediction } = require('./lib/scores');
 const { readDomains, writeDomains } = require('./lib/blocklistDb');
-const { titleOrUrlLooksAdult } = require('./lib/historyMatch');
 const { hostLooksLikeCaptcha, urlLooksLikeCaptcha } = require('./lib/captcha');
 
 const MAX_CONCURRENT = 2;
@@ -59,8 +58,16 @@ function hostnameOf(url) {
     }
 }
 
+function isInBlocklist(hostname) {
+    return hostMatches(hostname, domainSet);
+}
+
+function isIncluded(hostname) {
+    return hostMatches(hostname, customSet);
+}
+
 function isListed(hostname) {
-    return hostMatches(hostname, domainSet) || hostMatches(hostname, customSet);
+    return isInBlocklist(hostname) || isIncluded(hostname);
 }
 
 function siteIsProtected(hostname, settings) {
@@ -73,7 +80,15 @@ function shouldCleanHistoryItem(item, settings) {
     if (!item || !item.url || !/^https?:/i.test(item.url)) return false;
     const hostname = hostnameOf(item.url);
     if (!hostname || isExcluded(hostname, settings.excludedSites)) return false;
-    return isListed(hostname) || titleOrUrlLooksAdult(item.url, item.title);
+    return isListed(hostname);
+}
+
+async function pruneExcludedSites() {
+    const settings = await getSettings();
+    if (!settings.excludedSites.length || !domainSet.size) return settings;
+    const pruned = settings.excludedSites.filter(site => isInBlocklist(site));
+    if (pruned.length === settings.excludedSites.length) return settings;
+    return saveSettings({ excludedSites: pruned });
 }
 
 async function bumpDeleted(count, options = {}) {
@@ -137,6 +152,7 @@ async function refreshBlocklist(force) {
     }
 
     domainSet = new Set(domains);
+    await pruneExcludedSites();
     return domainSet.size;
 }
 
@@ -252,20 +268,13 @@ async function classifyForTab(urls, sender) {
     }
 
     const results = [];
-    let anyNsfw = false;
     for (const url of list) {
         if (urlLooksLikeCaptcha(url)) {
             results.push({ url, nsfw: false });
             continue;
         }
         const nsfw = await classifyCached(url, settings.nsfwThreshold);
-        if (nsfw) anyNsfw = true;
         results.push({ url, nsfw });
-    }
-
-    if (anyNsfw && settings.autoDeleteHistory && pageUrl && /^https?:/i.test(pageUrl)) {
-        await deleteHistoryUrl(pageUrl);
-        await bumpDeleted(1);
     }
 
     return { results };
@@ -352,14 +361,23 @@ async function getSiteStatus(frameHostname, tabHostname) {
     await bootBlocklist();
     const settings = await getSettings();
     const frameHost = String(frameHostname || '').toLowerCase();
-    const tabHost = String(tabHostname || '').toLowerCase();
+    const tabHost = String(tabHostname || frameHost || '').toLowerCase();
     const captchaFrame = hostLooksLikeCaptcha(frameHost);
-    const listed = !captchaFrame && (siteIsProtected(tabHost, settings) || siteIsProtected(frameHost, settings));
+    const inBlocklist = isInBlocklist(tabHost) || isInBlocklist(frameHost);
+    const inIncluded = isIncluded(tabHost) || isIncluded(frameHost);
+    const inExcluded = isExcluded(tabHost, settings.excludedSites)
+        || isExcluded(frameHost, settings.excludedSites);
+    const filterActive = (inBlocklist || inIncluded) && !inExcluded;
+    const listed = !captchaFrame && filterActive;
     return {
         ...settings,
         listed,
+        filterActive,
+        inBlocklist,
+        inIncluded,
+        inExcluded,
         captchaFrame,
-        hostname: frameHost,
+        hostname: frameHost || tabHost,
         tabHostname: tabHost
     };
 }
@@ -398,7 +416,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.action === 'GET_SITE_STATUS') {
-        const tabHostname = sender.tab && hostnameOf(sender.tab.url);
+        const tabHostname = (sender.tab && hostnameOf(sender.tab.url)) || message.hostname || '';
         const frameHostname = message.hostname || tabHostname;
         getSiteStatus(frameHostname, tabHostname)
             .then(sendResponse)
