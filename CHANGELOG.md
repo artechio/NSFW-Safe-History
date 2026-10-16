@@ -2,6 +2,14 @@
 
 All notable changes to NSFW Safe History are documented here.
 
+## [2.0.12] — 2026-10-16
+
+### Changed
+- Popup unsupported pages show “Open a website to change its filtering settings” instead of conflicting filter copy
+- Save settings moved below all options cards
+- Disabled blur controls keep readable labels; selected history period uses a muted green accent
+- Support footer links (Report an issue · Rate extension) on popup and options
+
 ## [2.0.11] — 2026-10-16
 
 ### Fixed
