@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Loading03Icon, RefreshIcon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import { FooterLinks } from "@/components/footer-links"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -37,6 +39,20 @@ function lines(value: string) {
     .filter(Boolean)
 }
 
+function formatLastUpdated(timestamp: number) {
+  const date = new Date(timestamp)
+  const datePart = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+  const timePart = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  return `Last updated: ${datePart} at ${timePart}`
+}
+
 export function OptionsApp() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -44,6 +60,7 @@ export function OptionsApp() {
   const [settings, setSettings] = useState<ExtensionSettings | null>(null)
   const [customDomains, setCustomDomains] = useState("")
   const [excludedSites, setExcludedSites] = useState("")
+  const version = useMemo(() => chrome.runtime.getManifest().version, [])
 
   function applySettings(response: ExtensionSettings & { error?: string }) {
     if (response.error) throw new Error(response.error)
@@ -129,11 +146,11 @@ export function OptionsApp() {
     try {
       const response = await updateBlocklist()
       if (!response?.ok) throw new Error("update failed")
-      toast.success(`Domain list updated (${response.count} domains)`)
+      toast.success(`Adult-site list updated (${response.count} domains)`)
       const next = await getSettings()
       applySettings(next)
     } catch {
-      toast.error("Could not update the domain list")
+      toast.error("Could not update the adult-site list")
     } finally {
       setUpdatingList(false)
     }
@@ -147,42 +164,47 @@ export function OptionsApp() {
     )
   }
 
-  return (
-    <div className="bg-background text-foreground relative min-h-screen">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,oklch(0.85_0.16_128/0.35),transparent_72%)]"
-      />
+  const blurControlsDisabled = !settings.blurEnabled
 
-      <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-6 p-6 md:p-10">
-        <header className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
+  return (
+    <div className="bg-background text-foreground min-h-screen">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-5 md:p-8">
+        <header className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             <img
               src={chrome.runtime.getURL("assets/icon128.png")}
               alt=""
-              className="size-11 rounded-xl"
+              className="size-9 rounded-lg"
             />
-            <div className="flex flex-col gap-1.5">
-              <h1 className="text-2xl font-semibold tracking-tight">NSFW Safe History</h1>
-              <p className="text-muted-foreground text-sm">
-                Tune history cleaning, blur, and the domain lists.
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h1 className="text-lg font-semibold tracking-tight">
+                NSFW Safe History
+              </h1>
+              <p className="text-muted-foreground text-xs leading-snug">
+                Control which sites appear in your history and when to blur adult
+                content.
               </p>
             </div>
           </div>
-          <Badge variant="secondary">v{chrome.runtime.getManifest().version}</Badge>
+          <Badge
+            variant="outline"
+            className="border-transparent bg-transparent px-1.5 text-[10px] font-normal text-muted-foreground"
+          >
+            v{version}
+          </Badge>
         </header>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
-            <CardTitle>Options</CardTitle>
+            <CardTitle>General</CardTitle>
           </CardHeader>
           <CardContent>
             <FieldGroup>
               <Field orientation="horizontal" className="justify-between gap-4">
                 <FieldContent className="min-w-0">
-                  <FieldLabel htmlFor="enabled">Extension on</FieldLabel>
+                  <FieldLabel htmlFor="enabled">Enable extension</FieldLabel>
                   <FieldDescription>
-                    When this is off, history is left as it is and nothing is blurred.
+                    Turn off to pause automatic history removal and media blurring.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -198,11 +220,11 @@ export function OptionsApp() {
               <Field orientation="horizontal" className="justify-between gap-4">
                 <FieldContent className="min-w-0">
                   <FieldLabel htmlFor="autoDeleteHistory">
-                    Auto-clean history
+                    Automatically remove matching visits
                   </FieldLabel>
                   <FieldDescription>
-                    Removes visits that match the built-in adult list or your
-                    included sites. Other sites stay in history.
+                    Remove visits to sites on the adult-site list and sites you
+                    add. Other visits stay in your history.
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -221,34 +243,33 @@ export function OptionsApp() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
-            <CardTitle>Blur NSFW media</CardTitle>
+            <CardTitle>Blur adult images and videos</CardTitle>
             <CardDescription>
-              Off by default. When on, only images, video, and media ads are
-              blurred on this device. Sites on the adult list blur right away;
-              other sites are checked locally.
+              Images and videos on listed adult sites are blurred immediately.
+              Other sites are checked on your device. Includes media ads.
             </CardDescription>
+            <CardAction>
+              <Switch
+                id="blurEnabled"
+                checked={settings.blurEnabled}
+                onCheckedChange={(checked) =>
+                  persistToggle(
+                    { blurEnabled: checked },
+                    { ...settings, blurEnabled: checked }
+                  )
+                }
+              />
+            </CardAction>
           </CardHeader>
           <CardContent>
-            <FieldGroup>
-              <Field orientation="horizontal" className="justify-between gap-4">
-                <FieldContent className="min-w-0">
-                  <FieldLabel htmlFor="blurEnabled">Blur NSFW media</FieldLabel>
-                </FieldContent>
-                <Switch
-                  id="blurEnabled"
-                  className="shrink-0"
-                  checked={settings.blurEnabled}
-                  onCheckedChange={(checked) =>
-                    persistToggle(
-                      { blurEnabled: checked },
-                      { ...settings, blurEnabled: checked }
-                    )
-                  }
-                />
-              </Field>
-
+            <FieldGroup
+              className={
+                blurControlsDisabled ? "pointer-events-none" : undefined
+              }
+              aria-disabled={blurControlsDisabled || undefined}
+            >
               <Field>
                 <FieldLabel htmlFor="blurIntensity">Blur strength (px)</FieldLabel>
                 <Input
@@ -256,6 +277,8 @@ export function OptionsApp() {
                   type="number"
                   min={5}
                   max={40}
+                  disabled={blurControlsDisabled}
+                  className={blurControlsDisabled ? "opacity-60" : undefined}
                   value={settings.blurIntensity}
                   onChange={(event) =>
                     setSettings({
@@ -264,18 +287,21 @@ export function OptionsApp() {
                     })
                   }
                 />
+                <FieldDescription>
+                  Higher values create a stronger blur.
+                </FieldDescription>
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="nsfwThreshold">
-                  Detection threshold (0.50–0.95)
-                </FieldLabel>
+                <FieldLabel htmlFor="nsfwThreshold">Detection threshold</FieldLabel>
                 <Input
                   id="nsfwThreshold"
                   type="number"
                   min={0.5}
                   max={0.95}
                   step={0.05}
+                  disabled={blurControlsDisabled}
+                  className={blurControlsDisabled ? "opacity-60" : undefined}
                   value={settings.nsfwThreshold}
                   onChange={(event) =>
                     setSettings({
@@ -285,63 +311,62 @@ export function OptionsApp() {
                   }
                 />
                 <FieldDescription>
-                  Higher values blur fewer borderline images. Only applies when blur
-                  is on.
+                  Higher values need more confidence before blurring. Range:
+                  0.50–0.95.
                 </FieldDescription>
               </Field>
             </FieldGroup>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
-            <CardTitle>Included sites</CardTitle>
+            <CardTitle>Additional sites to filter</CardTitle>
             <CardDescription>
-              One domain per line. Sites you add here (not in the NSFW list) are
-              filtered like adult hosts. Turning on Filter this site for a normal
-              site adds it here.
+              Apply filtering even if these sites aren’t on the adult-site list.
+              Enter one domain per line.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
               value={customDomains}
               onChange={(event) => setCustomDomains(event.target.value)}
-              rows={6}
+              rows={5}
               spellCheck={false}
-              placeholder={"example.com\ncdn.example.com"}
+              placeholder="example.com"
             />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
-            <CardTitle>Excluded sites</CardTitle>
+            <CardTitle>Exceptions to the adult-site list</CardTitle>
             <CardDescription>
-              One hostname per line. Only for NSFW-list sites you want left alone.
-              Turning off Filter this site on an adult host adds it here.
+              Skip filtering for these adult-list sites. Enter one hostname per
+              line.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
               value={excludedSites}
               onChange={(event) => setExcludedSites(event.target.value)}
-              rows={6}
+              rows={5}
               spellCheck={false}
               placeholder="adult.example.com"
             />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm" className="gap-3 py-3">
           <CardHeader>
-            <CardTitle>Domain list</CardTitle>
+            <CardTitle>Adult-site list</CardTitle>
             <CardDescription>
               {settings.lastBlocklistUpdate
-                ? `Last updated ${new Date(settings.lastBlocklistUpdate).toLocaleString()}.`
-                : "The built-in adult-domain list updates weekly."}
+                ? formatLastUpdated(settings.lastBlocklistUpdate)
+                : "Updates weekly."}
             </CardDescription>
           </CardHeader>
-          <CardFooter className="flex-wrap justify-between gap-3">
+          <CardFooter>
             <Button
               variant="outline"
               disabled={updatingList}
@@ -356,20 +381,25 @@ export function OptionsApp() {
               ) : (
                 <HugeiconsIcon icon={RefreshIcon} data-icon="inline-start" />
               )}
-              Update domain list now
-            </Button>
-            <Button disabled={saving} onClick={onSave}>
-              {saving ? (
-                <HugeiconsIcon
-                  icon={Loading03Icon}
-                  data-icon="inline-start"
-                  className="animate-spin"
-                />
-              ) : null}
-              Save settings
+              Update adult-site list
             </Button>
           </CardFooter>
         </Card>
+
+        <div className="flex justify-end">
+          <Button disabled={saving} onClick={onSave}>
+            {saving ? (
+              <HugeiconsIcon
+                icon={Loading03Icon}
+                data-icon="inline-start"
+                className="animate-spin"
+              />
+            ) : null}
+            Save settings
+          </Button>
+        </div>
+
+        <FooterLinks className="pb-1" />
       </div>
     </div>
   )
