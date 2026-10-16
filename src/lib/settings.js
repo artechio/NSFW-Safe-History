@@ -3,7 +3,7 @@ const { normalizeDomain } = require('./domains');
 const DEFAULT_SETTINGS = {
     enabled: true,
     autoDeleteHistory: true,
-    blurEnabled: true,
+    blurEnabled: false,
     blurIntensity: 20,
     nsfwThreshold: 0.7,
     excludedSites: [],
@@ -50,7 +50,7 @@ function normalizeSettings(raw) {
     return {
         enabled: source.enabled !== false,
         autoDeleteHistory: source.autoDeleteHistory !== false,
-        blurEnabled: source.blurEnabled !== false,
+        blurEnabled: source.blurEnabled === true,
         blurIntensity: clamp(Number.isFinite(blurIntensity) ? blurIntensity : DEFAULT_SETTINGS.blurIntensity, 5, 40),
         nsfwThreshold: clamp(Number.isFinite(nsfwThreshold) ? nsfwThreshold : DEFAULT_SETTINGS.nsfwThreshold, 0.5, 0.95),
         excludedSites: uniqueDomains(source.excludedSites),

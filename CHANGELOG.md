@@ -2,6 +2,20 @@
 
 All notable changes to NSFW Safe History are documented here.
 
+## [2.0.11] — 2026-10-16
+
+### Fixed
+- Filter this site is on only for NSFW-list (or included) hosts; turning it off no longer dumps normal sites into Excluded
+- History cleaning no longer uses title/URL heuristics or NSFW-media hits on non-listed sites
+- Excluded matching now covers subdomains the same way as the blocklist (`hostMatches`)
+- Blur applies only to images, video, and media iframes — not containers or text
+
+### Changed
+- Blur NSFW media defaults to off
+- Options: Custom domains renamed to Included sites; Excluded sites are for NSFW-list opt-outs only
+- GitHub Release title is the version only; notes describe Chromium browsers such as Edge
+- README links the Microsoft Edge Add-ons listing
+
 ## [2.0.10] — 2026-09-27
 
 ### Changed

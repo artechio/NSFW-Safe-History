@@ -57,21 +57,20 @@ jobs:
             body = (next === -1 ? rest : rest.slice(0, next)).trim();
           }
           const notes = [
-            `## NSFW Safe History v${version}`,
+            `## v${version}`,
             '',
-            'Chrome extension that clears adult sites from history on visit and blurs NSFW media with on-device classification — no image upload.',
+            'Chromium extension (Edge and other Chromium-based browsers) that clears adult sites from history on visit and can blur NSFW media with on-device classification — no image upload.',
             '',
             body || 'See CHANGELOG.md for details.',
             '',
             '### Install (ZIP — Load unpacked)',
             `1. Download \`nsfw-safe-history-${version}.zip\` below`,
             '2. Unzip the archive',
-            '3. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**',
+            '3. Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked**',
             '4. Select the unzipped folder (contains `manifest.json`)',
             '',
-            '> Self-signed `.crx` files are **not** published: Chrome rejects them with `CRX_REQUIRED_PROOF_MISSING` unless they come from the Chrome Web Store.',
-            '',
             '### Links',
+            '- [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/nsfw-safe-history/ajhlgoaigfcfjlhmkghchilnponmdfoa)',
             '- [README](https://github.com/artechio/NSFW-Safe-History#readme)',
             '- [Changelog](https://github.com/artechio/NSFW-Safe-History/blob/main/CHANGELOG.md)',
             '- [Report an issue](https://github.com/artechio/NSFW-Safe-History/issues)',
@@ -100,12 +99,12 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "$zip_name" --clobber
             gh release edit "$tag" \
-              --title "NSFW Safe History v${version}" \
+              --title "v${version}" \
               --notes-file release-notes.md \
               --latest
           else
             gh release create "$tag" "$zip_name" \
-              --title "NSFW Safe History v${version}" \
+              --title "v${version}" \
               --notes-file release-notes.md \
               --latest
           fi

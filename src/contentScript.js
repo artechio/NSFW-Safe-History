@@ -7,6 +7,7 @@ const queued = new Set();
 const decided = new Map();
 let settings = null;
 let siteListed = false;
+let blurAllowed = false;
 let captchaFrame = false;
 let flushTimer = null;
 const pending = [];
@@ -29,17 +30,7 @@ function imageUrl(element) {
         if (element.poster) return element.poster;
         return captureVideoFrame(element);
     }
-    return backgroundImageUrl(element);
-}
-
-function backgroundImageUrl(element) {
-    try {
-        const background = getComputedStyle(element).backgroundImage || '';
-        const match = background.match(/url\(["']?(https?:[^"')]+)["']?\)/i);
-        return match ? match[1] : '';
-    } catch (error) {
-        return '';
-    }
+    return '';
 }
 
 function captureVideoFrame(video) {
@@ -186,10 +177,6 @@ function readyToScan(element) {
     if (tag === 'IFRAME') {
         return elementSizeOk(element, MIN_AD_SIZE);
     }
-    if (tag === 'A' || tag === 'DIV' || tag === 'SPAN' || tag === 'SECTION' || tag === 'ASIDE') {
-        if (!elementSizeOk(element, MIN_AD_SIZE)) return false;
-        return Boolean(backgroundImageUrl(element));
-    }
     return false;
 }
 
@@ -210,10 +197,7 @@ const observer = new IntersectionObserver(entries => {
 function scan(root) {
     const scope = root && root.querySelectorAll ? root : document;
     scope.querySelectorAll('img, video, iframe').forEach(consider);
-    scope.querySelectorAll('a, div, span, section, aside').forEach(element => {
-        if (backgroundImageUrl(element)) consider(element);
-    });
-    if (root && root.tagName) consider(root);
+    if (root && root.tagName && /^(IMG|VIDEO|IFRAME)$/.test(root.tagName)) consider(root);
 }
 
 function syncAppearance() {
@@ -226,11 +210,11 @@ function syncAppearance() {
 
 function filteringActive() {
     if (captchaFrame || hostLooksLikeCaptcha(location.hostname)) return false;
-    return Boolean(settings && settings.enabled && settings.blurEnabled && !(settings.excludedSites || []).includes(location.hostname));
+    return Boolean(settings && settings.enabled && settings.blurEnabled && blurAllowed);
 }
 
 function rescan() {
-    document.querySelectorAll('img, video, iframe, a, div, span, section, aside').forEach(element => {
+    document.querySelectorAll('img, video, iframe').forEach(element => {
         delete element.dataset.nsfwWatch;
     });
     decided.clear();
@@ -255,7 +239,7 @@ function watchDom() {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['src', 'poster', 'srcset', 'style', 'class']
+        attributeFilter: ['src', 'poster', 'srcset']
     });
 }
 
@@ -264,6 +248,7 @@ function applySiteStatus(response) {
     settings = response;
     captchaFrame = Boolean(response.captchaFrame) || hostLooksLikeCaptcha(location.hostname);
     siteListed = Boolean(response.listed) && !captchaFrame;
+    blurAllowed = !Boolean(response.inExcluded);
     syncAppearance();
     if (captchaFrame) {
         document.querySelectorAll('.nsfw-blur').forEach(clearBlur);

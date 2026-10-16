@@ -10,6 +10,18 @@ export type ExtensionSettings = {
   lastCleanRange: "today" | "week" | "month" | "all"
 }
 
+export type SiteStatus = ExtensionSettings & {
+  listed?: boolean
+  filterActive?: boolean
+  inBlocklist?: boolean
+  inIncluded?: boolean
+  inExcluded?: boolean
+  captchaFrame?: boolean
+  hostname?: string
+  tabHostname?: string
+  error?: string
+}
+
 export type CleanRange = ExtensionSettings["lastCleanRange"]
 
 function sendMessage<T>(message: Record<string, unknown>): Promise<T> {
@@ -24,6 +36,10 @@ function sendMessage<T>(message: Record<string, unknown>): Promise<T> {
 
 export function getSettings() {
   return sendMessage<ExtensionSettings & { error?: string }>({ action: "GET_SETTINGS" })
+}
+
+export function getSiteStatus(hostname: string) {
+  return sendMessage<SiteStatus>({ action: "GET_SITE_STATUS", hostname })
 }
 
 export function updateSettings(settings: Partial<ExtensionSettings>) {

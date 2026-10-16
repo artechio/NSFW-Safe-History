@@ -18,6 +18,8 @@ test('normalizeSettings fills defaults and clamps numbers', () => {
     assert.deepEqual(settings.excludedSites, ['safe.example']);
     assert.equal(settings.enabled, true);
     assert.equal(settings.autoDeleteHistory, true);
+    assert.equal(settings.blurEnabled, false);
+    assert.equal(DEFAULT_SETTINGS.blurEnabled, false);
 });
 
 test('normalizeSettings preserves explicit off switches and clean ranges', () => {
@@ -31,6 +33,12 @@ test('normalizeSettings preserves explicit off switches and clean ranges', () =>
     assert.equal(settings.autoDeleteHistory, false);
     assert.equal(settings.blurEnabled, false);
     assert.equal(settings.lastCleanRange, 'all');
+});
+
+test('normalizeSettings turns blur on only when explicitly true', () => {
+    assert.equal(normalizeSettings({}).blurEnabled, false);
+    assert.equal(normalizeSettings({ blurEnabled: true }).blurEnabled, true);
+    assert.equal(normalizeSettings({ blurEnabled: false }).blurEnabled, false);
 });
 
 test('historyStartTime maps today week month and all', () => {

@@ -23,6 +23,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   clearHistory,
   getActiveHostname,
+  getSiteStatus,
   getSettings,
   updateSettings,
   type CleanRange,
@@ -39,19 +40,28 @@ export function PopupApp() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [host, setHost] = useState("")
-  const [noHistory, setNoHistory] = useState(false)
-  const [blurEnabled, setBlurEnabled] = useState(true)
+  const [filterSite, setFilterSite] = useState(false)
+  const [inBlocklist, setInBlocklist] = useState(false)
+  const [blurEnabled, setBlurEnabled] = useState(false)
   const [range, setRange] = useState<CleanRange>("week")
   const version = useMemo(() => chrome.runtime.getManifest().version, [])
 
   useEffect(() => {
     Promise.all([getSettings(), getActiveHostname()])
-      .then(([settings, hostname]) => {
+      .then(async ([settings, hostname]) => {
         if (settings.error) throw new Error(settings.error)
         setHost(hostname)
         setBlurEnabled(Boolean(settings.blurEnabled))
         setRange(settings.lastCleanRange || "week")
-        setNoHistory((settings.customDomains || []).includes(hostname))
+        if (!hostname) {
+          setFilterSite(false)
+          setInBlocklist(false)
+          return
+        }
+        const status = await getSiteStatus(hostname)
+        if (status.error) throw new Error(status.error)
+        setFilterSite(Boolean(status.filterActive))
+        setInBlocklist(Boolean(status.inBlocklist))
       })
       .catch(() => toast.error("Could not load settings"))
       .finally(() => setLoading(false))
@@ -66,34 +76,50 @@ export function PopupApp() {
       if (changes.blurEnabled && typeof changes.blurEnabled.newValue === "boolean") {
         setBlurEnabled(changes.blurEnabled.newValue)
       }
-      if (changes.customDomains && host) {
-        const custom = (changes.customDomains.newValue as string[]) || []
-        setNoHistory(custom.includes(host))
+      if (
+        host &&
+        (changes.customDomains || changes.excludedSites)
+      ) {
+        getSiteStatus(host)
+          .then((status) => {
+            if (status.error) return
+            setFilterSite(Boolean(status.filterActive))
+            setInBlocklist(Boolean(status.inBlocklist))
+          })
+          .catch(() => {})
       }
     }
     chrome.storage.onChanged.addListener(onStorageChanged)
     return () => chrome.storage.onChanged.removeListener(onStorageChanged)
   }, [host])
 
-  async function onNoHistoryChange(checked: boolean) {
+  async function onFilterChange(checked: boolean) {
     if (!host) return
-    setNoHistory(checked)
+    setFilterSite(checked)
     try {
       const settings = await getSettings()
-      const custom = new Set(settings.customDomains || [])
+      const included = new Set(settings.customDomains || [])
       const excluded = new Set(settings.excludedSites || [])
       if (checked) {
-        custom.add(host)
         excluded.delete(host)
+        if (!inBlocklist) included.add(host)
       } else {
-        custom.delete(host)
+        included.delete(host)
+        if (inBlocklist) excluded.add(host)
       }
       await updateSettings({
-        customDomains: [...custom],
-        ...(checked ? { excludedSites: [...excluded] } : {}),
+        customDomains: [...included],
+        excludedSites: [...excluded],
       })
     } catch {
       toast.error("Could not update this site")
+      try {
+        const status = await getSiteStatus(host)
+        setFilterSite(Boolean(status.filterActive))
+        setInBlocklist(Boolean(status.inBlocklist))
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -167,17 +193,17 @@ export function PopupApp() {
 
         <Card size="sm">
           <CardHeader>
-            <CardTitle>No history for this site</CardTitle>
+            <CardTitle>Filter this site</CardTitle>
             <CardDescription>
-              {noHistory
-                ? "Visits to this site won't be saved in your history."
-                : "Visits to this site stay in your history unless it's on the built-in adult list."}
+              {filterSite
+                ? "Visits to this site are removed from history."
+                : "This site is left alone. History is not cleared."}
             </CardDescription>
             <CardAction>
               <Switch
-                checked={noHistory}
+                checked={filterSite}
                 disabled={loading || !host}
-                onCheckedChange={onNoHistoryChange}
+                onCheckedChange={onFilterChange}
               />
             </CardAction>
           </CardHeader>
@@ -187,9 +213,8 @@ export function PopupApp() {
           <CardHeader>
             <CardTitle>Blur NSFW media</CardTitle>
             <CardDescription>
-              When on, NSFW images and video are blurred on every tab you open, on
-              this device. Sites on the adult list are blurred right away; other
-              sites are checked locally.
+              When on, NSFW images, video, and media ads are blurred on this
+              device. Off by default.
             </CardDescription>
             <CardAction>
               <Switch
