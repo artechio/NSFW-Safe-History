@@ -1,56 +1,125 @@
+<div align="center">
+
+<img src="assets/icon128.png" width="96" alt="NSFW Safe History icon">
+
 # NSFW Safe History
 
-**Chromium extension (Edge and other Chromium-based browsers) for private browsing hygiene:** remove adult sites from history as soon as they are visited, and optionally blur NSFW media on-device — without uploading your media.
+**Keep adult sites out of your browser history, and blur NSFW images on your own device.**
 
 [![Microsoft Edge Add-ons](https://img.shields.io/badge/Edge%20Add--ons-Install-0078D4?logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/nsfw-safe-history/ajhlgoaigfcfjlhmkghchilnponmdfoa)
 [![Latest release](https://img.shields.io/github/v/release/artechio/NSFW-Safe-History?label=release)](https://github.com/artechio/NSFW-Safe-History/releases/latest)
 [![Build](https://img.shields.io/github/actions/workflow/status/artechio/NSFW-Safe-History/build-extension.yml?branch=main&label=build)](https://github.com/artechio/NSFW-Safe-History/actions/workflows/build-extension.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-NSFW Safe History is a Manifest V3 extension for people who want **history privacy**, **adult content filtering**, and optional **local NSFW media blur** in one lightweight tool. It matches visited hosts against an on-device adult-domain list, deletes matching history entries immediately, and can run [nsfwjs](https://github.com/infinitered/nsfwjs) classification in the browser so image bytes never leave your machine.
+[Install](#install) · [Features](#features) · [Privacy](#privacy) · [Build from source](#build-from-source) · [Changelog](CHANGELOG.md)
 
-## Install from Microsoft Edge Add-ons
+</div>
 
-Install from the [Microsoft Edge Add-ons listing](https://microsoftedge.microsoft.com/addons/detail/nsfw-safe-history/ajhlgoaigfcfjlhmkghchilnponmdfoa).
+---
 
-## Why use it
+<table>
+<tr>
+<td width="36%" valign="top">
+<img src="docs/screenshots/popup.png" alt="Popup: filter this site, blur toggle, remove matching visits, and removal stats">
+</td>
+<td valign="top">
 
-| Need | What you get |
+### What it does
+
+- **Removes adult visits from history as they happen.** Each visit is checked against an on-device list of about 75,000 adult domains, and matches are deleted right away.
+- **Cleans up past visits** from today, this week, this month, or all time.
+- **Blurs NSFW images and videos.** A small MobileNet model runs inside the browser to classify them. Pixels never leave your machine.
+- **You decide which sites count.** Add sites to filter, or make exceptions to the list, in one click from the popup.
+
+Works in Microsoft Edge, Chrome, Brave, Opera, Vivaldi and other Chromium browsers (Manifest V3).
+
+</td>
+</tr>
+</table>
+
+## Install
+
+| Where | How |
 | --- | --- |
-| Clean browser history | Adult and included domains are removed on visit |
-| On-page protection | Images, videos, and media ads can be blurred after local classification (off by default) |
-| Privacy-first design | No image upload; weekly domain-list fetch only |
-| Control | Filter this site, included sites, excluded NSFW hosts, blur strength, detection threshold |
+| **Microsoft Edge Add-ons** (recommended) | [Get it from the store](https://microsoftedge.microsoft.com/addons/detail/nsfw-safe-history/ajhlgoaigfcfjlhmkghchilnponmdfoa). Updates are automatic. |
+| **GitHub Release** (any Chromium browser) | Download `nsfw-safe-history-*.zip` from the [latest release](https://github.com/artechio/NSFW-Safe-History/releases/latest) and unzip it. Open `edge://extensions` or `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick the folder that contains `manifest.json`. |
 
 ## Features
 
-- **Instant history cleanup** — matches the page hostname (and parent hosts) against a domain set in IndexedDB, then deletes that URL from history
-- **Filter this site** — on by default only for NSFW-list hosts; turn on to include a normal site, turn off to exclude an adult host
-- **On-device NSFW blur** — off by default; when on, blurs images, video, and media iframes only when `Porn` or `Hentai` scores meet your threshold (`Sexy` alone does not blur)
-- **Listed-site media blur** — on known adult hosts, blurs images, videos, and media ad iframes right away
-- **Captcha-safe** — leaves reCAPTCHA, hCaptcha, Cloudflare Turnstile, and similar challenges usable
-- **Manual clean ranges** — clear matching history for today, this week, this month, or all time from the popup
-- **Included & excluded lists** — add extra hosts to always filter; opt out of NSFW-list hosts you want untouched
-- **Keyboard shortcuts** — `Alt+Shift+U` toggle blur, `Alt+Shift+F` filter this site, `Alt+Shift+H` remove today’s matching visits
-- **Toolbar badge & stats** — a discreet dot on filtered tabs, plus removed-today / removed-total counters kept on-device
-- **Backup** — export and import settings as JSON (no history included)
-- **Modern UI** — popup and options rebuilt with shadcn/ui (mira)
+### On-device media blur
+
+Blur is **off by default**. Turn it on from the popup or with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd>.
+
+- **On sites you filter:** every image, video and media ad is blurred straight away.
+- **On other sites:** visible media is classified locally, and blurred only when the `Porn` or `Hentai` score reaches your threshold. `Sexy` alone never triggers a blur.
+- **To reveal one item:** click it.
+
+| Blur off | Blur on (filtered site) |
+| --- | --- |
+| ![Demo gallery without blur](docs/screenshots/blur-before.png) | ![Demo gallery with every image blurred](docs/screenshots/blur-after.png) |
+
+<sub>The demo uses placeholder landscapes on a test site added to the filter list.</sub>
+
+### History cleanup
+
+- **Automatic:** visits to listed or added sites, and their subdomains, are removed as you browse.
+- **Filter this site:** switching it on also removes your earlier visits to that site.
+- **Manual clean:** removes matching visits for a chosen period. Everything else stays in your history.
+- **Removal stats:** the popup shows how many visits were removed today and in total. The numbers are kept only on this device.
+- **Toolbar badge:** a small dot shows that the current tab is filtered, without naming why. `OFF` shows while the extension is paused.
+
+### Settings
+
+<img src="docs/screenshots/options.png" width="560" alt="Settings page: general switches, blur strength and threshold, site lists, keyboard shortcuts, and backup">
+
+- **Blur strength** (5–40 px) and **detection threshold** (0.50–0.95).
+- **Additional sites to filter:** sites that aren't on the list but should be treated as if they were.
+- **Exceptions:** sites on the list that you want left alone.
+- **Backup:** export your switches and site lists to JSON and import them on another browser. History is never included.
+- **Captcha-safe:** reCAPTCHA, hCaptcha, Cloudflare Turnstile and similar challenges are never blurred.
+
+### Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd> | Turn media blur on or off |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> | Filter or stop filtering the current site |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> | Remove today's matching visits |
+
+To change them, open **Settings → Keyboard shortcuts → Change shortcuts**, or go to `edge://extensions/shortcuts`.
 
 ## Privacy
 
-- Classification runs **locally** in an offscreen document (TensorFlow.js / nsfwjs).
-- Image pixels are **not uploaded**.
-- The extension’s only standalone network request is the optional weekly refresh of the adult-domain list.
-- You choose blur intensity, detection threshold, included sites, and which NSFW hosts are excluded.
+- **Nothing is uploaded.** Image pixels, page contents and your history are never sent anywhere.
+- **Classification is local.** It runs in an offscreen extension page using [nsfwjs](https://github.com/infinitered/nsfwjs) and TensorFlow.js. The model ships inside the extension.
+- **To classify an image, the extension reads it again** from the browser cache or from the site that served it, without cookies.
+- **One request of its own:** the weekly download of the public [Steven Black porn-only hosts list](https://github.com/StevenBlack/hosts). No user data is sent with it.
+- **No accounts, no analytics, no ads.**
 
-## Install from GitHub Release
+See the full [privacy policy](PRIVACY.md).
 
-1. Open the [latest release](https://github.com/artechio/NSFW-Safe-History/releases/latest).
-2. Download `nsfw-safe-history-*.zip` and unzip it.
-3. Go to `edge://extensions` or `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.
-4. Select the unzipped folder (the one that contains `manifest.json`).
+## How it works
 
-## Install from source
+```mermaid
+flowchart LR
+    V[You visit a page] --> M{Host or parent domain<br/>on the list or added?}
+    M -- no --> K[Visit stays in history]
+    M -- yes --> X{Site in your<br/>exceptions?}
+    X -- yes --> K
+    X -- no --> D[Visit deleted from history]
+    D --> B{Blur on?}
+    B -- yes --> A[All media blurred]
+    M -- no --> C{Blur on?}
+    C -- yes --> L[Each visible image classified<br/>on-device and blurred if NSFW]
+```
+
+- **Domain check:** an in-memory `Set` lookup, cached in IndexedDB. It walks up through parent domains, so `cdn.example.com` matches `example.com`.
+- **History removal:** uses `chrome.history.deleteUrl`, which removes every visit to that exact URL.
+- **Image checks:** at most two run at once and are cached in an LRU. Captcha frames and widgets are skipped.
+
+## Build from source
+
+You need Node.js 20.19+ or 22.12+.
 
 ```bash
 npm install
@@ -59,46 +128,35 @@ npm test
 npm run build
 ```
 
-Then load the `dist/` folder as an unpacked extension.
+Load the `dist/` folder as an unpacked extension.
 
-Optional maintainers scripts:
-
-- `npm run update-blocklist` — refresh `assets/blocklist.txt` from the Steven Black porn-only hosts list  
-- `npm run download-model` — refresh bundled MobileNet weights in `assets/model/`  
-- `npm run generate-icons` — rebuild toolbar PNGs plus `assets/icons/light` and `assets/icons/dark` from `assets/icon.svg`
-
-## Settings
-
-| Control | Where |
+| Script | What it does |
 | --- | --- |
-| Filter this site / blur toggle / history range | Popup |
-| Master protection, auto-delete, blur strength, threshold, included & excluded domains, blocklist update, shortcuts, backup | Options page |
+| `npm run dev` / `npm run dev:ui` | Watch builds for the core scripts and the popup/options UI |
+| `npm run update-blocklist` | Refresh `assets/blocklist.txt` from the Steven Black list |
+| `npm run download-model` | Refresh the bundled MobileNet weights in `assets/model/` |
+| `npm run generate-icons` | Rebuild the toolbar and light/dark icon sets from `assets/icon.svg` |
 
-## How it works (short)
+**Project layout:**
 
-1. Hostnames are checked against the NSFW domain set plus your included list (Set lookup + parent walk).
-2. Matching visits are deleted via `chrome.history` as they happen, unless the host is excluded.
-3. When blur is on, visible media is classified on-device (or blurred immediately on listed adult sites).
-4. Captcha frames and widgets are skipped so challenges stay readable.
+```
+src/background.js     service worker: history, blocklist, badge, shortcuts, messaging
+src/contentScript.js  finds media on the page and applies blur
+src/offscreen.js      runs the nsfwjs model
+src/lib/              pure helpers (domains, settings, stats, backup, LRU); unit-tested in test/
+ext-ui/               popup and settings pages (Vite, React, Tailwind, shadcn/ui)
+```
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+Every push to `main` builds the extension and publishes a GitHub Release with the ZIP and the matching [CHANGELOG](CHANGELOG.md) notes.
 
-## Tech stack
+## Contributing
 
-- Chrome Manifest V3 (service worker, offscreen document, content scripts)
-- Domain matching + IndexedDB blocklist cache
-- nsfwjs / MobileNet for local classification
-- Webpack for core scripts; Vite + React + Tailwind + shadcn/ui for popup & options
-
-## Keywords
-
-`chrome extension` · `edge extension` · `nsfw filter` · `history cleaner` · `adult content blocker` · `privacy` · `on-device blur` · `manifest v3` · `nsfwjs`
+Bug reports and pull requests are welcome. [Open an issue](https://github.com/artechio/NSFW-Safe-History/issues) for false positives, sites that break, or feature ideas. Run `npm test` before you send a PR.
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
 
-Third-party:
-
-- Domain list: [Steven Black porn-only hosts](https://github.com/StevenBlack/hosts)
-- Classification: [nsfwjs](https://github.com/infinitered/nsfwjs)
+**Third-party:**
+- Domain list: [Steven Black hosts](https://github.com/StevenBlack/hosts) (MIT)
+- Classifier: [nsfwjs](https://github.com/infinitered/nsfwjs) (MIT)

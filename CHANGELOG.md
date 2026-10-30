@@ -21,6 +21,9 @@ All notable changes to NSFW Safe History are documented here.
 - Build tooling: `copy-webpack-plugin` 14 (`serialize-javascript`), `sharp` 0.35 (libvips/libheif/librsvg CVEs), plus `npm audit fix` in both packages (vite, undici, qs, form-data, tough-cookie, and others)
 - CI actions moved to Node 24 majors (`checkout`, `setup-node`, `upload-artifact` v7)
 
+### Docs
+- README rewritten with screenshots of the popup, settings, and blur; privacy policy updated for stats, backups, and image re-reads
+
 ### Removed
 - Unused title/URL heuristic module left over from 2.0.11
 
