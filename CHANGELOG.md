@@ -16,6 +16,11 @@ All notable changes to NSFW Safe History are documented here.
 - Failed or timed-out image checks were cached as “safe” for the rest of the session; they are now retried
 - The image result cache is capped (LRU) and keyed by threshold, so memory stays bounded and threshold changes take effect
 
+### Security
+- `nsfwjs` 2.4.2 → 4.4.0: drops the `@nsfw-filter/gif-frames` → `request` / `jpeg-js` chain behind the critical and high advisories. Predictions on the bundled model are identical
+- Build tooling: `copy-webpack-plugin` 14 (`serialize-javascript`), `sharp` 0.35 (libvips/libheif/librsvg CVEs), plus `npm audit fix` in both packages (vite, undici, qs, form-data, tough-cookie, and others)
+- CI actions moved to Node 24 majors (`checkout`, `setup-node`, `upload-artifact` v7)
+
 ### Removed
 - Unused title/URL heuristic module left over from 2.0.11
 
