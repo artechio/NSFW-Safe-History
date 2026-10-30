@@ -31,6 +31,9 @@ Install from the [Microsoft Edge Add-ons listing](https://microsoftedge.microsof
 - **Captcha-safe** — leaves reCAPTCHA, hCaptcha, Cloudflare Turnstile, and similar challenges usable
 - **Manual clean ranges** — clear matching history for today, this week, this month, or all time from the popup
 - **Included & excluded lists** — add extra hosts to always filter; opt out of NSFW-list hosts you want untouched
+- **Keyboard shortcuts** — `Alt+Shift+U` toggle blur, `Alt+Shift+F` filter this site, `Alt+Shift+H` remove today’s matching visits
+- **Toolbar badge & stats** — a discreet dot on filtered tabs, plus removed-today / removed-total counters kept on-device
+- **Backup** — export and import settings as JSON (no history included)
 - **Modern UI** — popup and options rebuilt with shadcn/ui (mira)
 
 ## Privacy
@@ -69,7 +72,7 @@ Optional maintainers scripts:
 | Control | Where |
 | --- | --- |
 | Filter this site / blur toggle / history range | Popup |
-| Master protection, auto-delete, blur strength, threshold, included & excluded domains, blocklist update | Options page |
+| Master protection, auto-delete, blur strength, threshold, included & excluded domains, blocklist update, shortcuts, backup | Options page |
 
 ## How it works (short)
 

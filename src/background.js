@@ -3,10 +3,16 @@ const { normalizeSettings, historyStartTime, normalizeCleanRange } = require('./
 const { isNsfwPrediction } = require('./lib/scores');
 const { readDomains, writeDomains } = require('./lib/blocklistDb');
 const { hostLooksLikeCaptcha, urlLooksLikeCaptcha } = require('./lib/captcha');
+const { LruCache } = require('./lib/lru');
+const { exportSettings, parseBackup } = require('./lib/backup');
+const { STATS_KEY, normalizeStats, addRemoved } = require('./lib/stats');
 
 const MAX_CONCURRENT = 2;
 const CLASSIFY_TIMEOUT_MS = 25000;
 const HISTORY_CHUNK_MS = 7 * 24 * 60 * 60 * 1000;
+const IMAGE_CACHE_LIMIT = 600;
+const BADGE_COLOR = '#16a34a';
+const BADGE_OFF_COLOR = '#6b7280';
 const HISTORY_SEARCH_QUERIES = ['', 'porn', 'xxx', 'pornhub', 'xvideos', 'xnxx', 'onlyfans', 'hentai', 'nsfw'];
 
 let settingsCache = null;
@@ -24,7 +30,8 @@ let nextId = 0;
 let running = 0;
 const waiters = [];
 const pendingClassify = new Map();
-const imageCache = new Map();
+const imageCache = new LruCache(IMAGE_CACHE_LIMIT);
+let statsWrite = Promise.resolve();
 
 function getSettings() {
     if (settingsCache) return Promise.resolve(settingsCache);
@@ -102,6 +109,20 @@ async function bumpDeleted(count, options = {}) {
         update.lastClearAt = Date.now();
     }
     await chrome.storage.session.set(update);
+    if (amount > 0) await recordRemoved(amount);
+}
+
+function recordRemoved(amount) {
+    statsWrite = statsWrite.then(async () => {
+        const stored = await chrome.storage.local.get([STATS_KEY]);
+        await chrome.storage.local.set({ [STATS_KEY]: addRemoved(stored[STATS_KEY], amount, Date.now()) });
+    }).catch(error => console.warn('Stats update failed', error));
+    return statsWrite;
+}
+
+async function getStats() {
+    const stored = await chrome.storage.local.get([STATS_KEY]);
+    return normalizeStats(stored[STATS_KEY], Date.now());
 }
 
 async function deleteHistoryUrl(url) {
@@ -233,15 +254,16 @@ function requestClassify(url) {
 }
 
 async function classifyCached(url, threshold) {
-    if (imageCache.has(url)) return imageCache.get(url);
+    const key = `${threshold}|${url}`;
+    if (imageCache.has(key)) return imageCache.get(key);
     try {
         const predictions = await schedule(() => requestClassify(url));
         const nsfw = isNsfwPrediction(predictions, threshold);
-        imageCache.set(url, nsfw);
+        imageCache.set(key, nsfw);
         return nsfw;
     } catch (error) {
+        // Transient failures (timeouts, offscreen restarts) are not cached so the image can be retried.
         console.warn('Image classification failed', error);
-        imageCache.set(url, false);
         return false;
     }
 }
@@ -357,6 +379,103 @@ async function clearMatchingHistory(range) {
     return deleted;
 }
 
+async function cleanSiteHistory(hostname) {
+    const host = String(hostname || '').toLowerCase();
+    if (!host) return 0;
+    const hostSet = new Set([host]);
+    const settings = await getSettings();
+    const items = await chrome.history.search({ text: host, startTime: 0, maxResults: 10000 });
+    const targets = (items || []).filter(item =>
+        shouldCleanHistoryItem(item, settings) && hostMatches(hostnameOf(item.url), hostSet)
+    );
+    const results = await Promise.allSettled(targets.map(item => deleteHistoryUrl(item.url)));
+    const deleted = results.filter(result => result.status === 'fulfilled').length;
+    if (deleted) await bumpDeleted(deleted);
+    return deleted;
+}
+
+async function setSiteFilter(hostname, enabled) {
+    await bootBlocklist();
+    const host = String(hostname || '').toLowerCase();
+    if (!host) throw new Error('No site to filter');
+    const settings = await getSettings();
+    const included = new Set(settings.customDomains);
+    const excluded = new Set(settings.excludedSites);
+    const inBlocklist = isInBlocklist(host);
+
+    if (enabled) {
+        excluded.delete(host);
+        if (!inBlocklist) included.add(host);
+    } else {
+        included.delete(host);
+        if (inBlocklist) excluded.add(host);
+    }
+
+    await saveSettings({ customDomains: [...included], excludedSites: [...excluded] });
+    let deleted = 0;
+    if (enabled && settings.enabled && settings.autoDeleteHistory) {
+        deleted = await cleanSiteHistory(host).catch(error => {
+            console.warn('Site history cleanup failed', error);
+            return 0;
+        });
+    }
+    const status = await getSiteStatus(host, host);
+    return { ...status, deleted };
+}
+
+async function updateBadge(tabId, url) {
+    if (tabId === undefined || tabId < 0) return;
+    const settings = await getSettings();
+    let text = '';
+    let color = BADGE_COLOR;
+    if (!settings.enabled) {
+        text = 'OFF';
+        color = BADGE_OFF_COLOR;
+    } else if (blocklistLoaded && /^https?:/i.test(url || '') && siteIsProtected(hostnameOf(url), settings)) {
+        // A discreet dot: shows the tab is filtered without spelling out why.
+        text = '•';
+    }
+    try {
+        await chrome.action.setBadgeBackgroundColor({ tabId, color });
+        await chrome.action.setBadgeText({ tabId, text });
+    } catch (error) {
+        // The tab may have closed before the badge was set.
+    }
+}
+
+async function refreshAllBadges() {
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(tabs.map(tab => updateBadge(tab.id, tab.url)));
+}
+
+async function getActiveTab() {
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    return tab;
+}
+
+async function runCommand(command) {
+    if (command === 'toggle-blur') {
+        const settings = await getSettings();
+        await saveSettings({ blurEnabled: !settings.blurEnabled });
+        return;
+    }
+
+    if (command === 'toggle-site-filter') {
+        const tab = await getActiveTab();
+        if (!tab || !/^https?:/i.test(tab.url || '')) return;
+        const hostname = hostnameOf(tab.url);
+        const status = await getSiteStatus(hostname, hostname);
+        if (!status.enabled) return;
+        await setSiteFilter(hostname, !status.filterActive);
+        return;
+    }
+
+    if (command === 'clean-today') {
+        const settings = await getSettings();
+        if (settings.enabled) await clearMatchingHistory('today');
+    }
+}
+
 async function getSiteStatus(frameHostname, tabHostname) {
     await bootBlocklist();
     const settings = await getSettings();
@@ -441,6 +560,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
+    if (message.action === 'SET_SITE_FILTER') {
+        setSiteFilter(message.hostname, Boolean(message.enabled))
+            .then(sendResponse)
+            .catch(error => sendResponse({ error: error.message }));
+        return true;
+    }
+
+    if (message.action === 'EXPORT_SETTINGS') {
+        getSettings()
+            .then(settings => sendResponse({ ok: true, backup: exportSettings(settings, chrome.runtime.getManifest().version) }))
+            .catch(error => sendResponse({ ok: false, error: error.message }));
+        return true;
+    }
+
+    if (message.action === 'IMPORT_SETTINGS') {
+        Promise.resolve()
+            .then(() => saveSettings(parseBackup(message.backup)))
+            .then(settings => sendResponse({ ok: true, settings }))
+            .catch(error => sendResponse({ ok: false, error: error.message }));
+        return true;
+    }
+
+    if (message.action === 'GET_STATS') {
+        getStats().then(sendResponse).catch(error => sendResponse({ error: error.message }));
+        return true;
+    }
+
     if (message.action === 'UPDATE_BLOCKLIST') {
         refreshBlocklist(true)
             .then(count => sendResponse({ ok: true, count }))
@@ -457,7 +603,10 @@ chrome.history.onVisited.addListener(item => {
     handleVisit(item).catch(error => console.warn('History visit handling failed', error));
 });
 
-chrome.alarms.create('updateBlocklist', { periodInMinutes: 7 * 24 * 60 });
+// The service worker restarts often; recreating the alarm each time would keep pushing it back.
+chrome.alarms.get('updateBlocklist').then(alarm => {
+    if (!alarm) chrome.alarms.create('updateBlocklist', { periodInMinutes: 7 * 24 * 60 });
+}).catch(error => console.warn('Alarm setup failed', error));
 chrome.alarms.onAlarm.addListener(alarm => {
     if (alarm.name === 'updateBlocklist') {
         refreshBlocklist(true).catch(error => console.warn('Scheduled blocklist update failed', error));
@@ -467,7 +616,26 @@ chrome.alarms.onAlarm.addListener(alarm => {
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
     settingsCache = null;
-    getSettings().catch(error => console.warn('Settings reload failed', error));
+    getSettings()
+        .then(() => {
+            if (changes.enabled || changes.customDomains || changes.excludedSites) return refreshAllBadges();
+        })
+        .catch(error => console.warn('Settings reload failed', error));
+});
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+    chrome.tabs.get(tabId)
+        .then(tab => updateBadge(tab.id, tab.url))
+        .catch(() => {});
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (!changeInfo.url && changeInfo.status !== 'loading') return;
+    updateBadge(tabId, tab.url).catch(() => {});
+});
+
+chrome.commands.onCommand.addListener(command => {
+    runCommand(command).catch(error => console.warn(`Command ${command} failed`, error));
 });
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -475,4 +643,4 @@ chrome.runtime.onInstalled.addListener(() => {
     bootBlocklist();
 });
 
-bootBlocklist();
+bootBlocklist().then(refreshAllBadges).catch(error => console.warn('Badge refresh failed', error));

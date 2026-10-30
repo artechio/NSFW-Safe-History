@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "NSFW Safe History",
-    "version": "2.0.12",
+    "version": "2.1.0",
     "description": "Clear adult sites from browsing history on visit and blur NSFW images on-device — no upload",
     "permissions": [
         "storage",
@@ -32,6 +32,20 @@
         "128": "assets/icon128.png"
     },
     "options_page": "options.html",
+    "commands": {
+        "toggle-blur": {
+            "suggested_key": { "default": "Alt+Shift+U" },
+            "description": "Turn media blur on or off"
+        },
+        "toggle-site-filter": {
+            "suggested_key": { "default": "Alt+Shift+F" },
+            "description": "Filter or stop filtering the current site"
+        },
+        "clean-today": {
+            "suggested_key": { "default": "Alt+Shift+H" },
+            "description": "Remove today's matching visits"
+        }
+    },
     "content_scripts": [
         {
             "matches": ["http://*/*", "https://*/*"],
