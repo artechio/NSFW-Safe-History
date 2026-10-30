@@ -2,6 +2,31 @@
 
 All notable changes to NSFW Safe History are documented here.
 
+## [2.1.0] — 2026-10-30
+
+### Added
+- Keyboard shortcuts: **Alt+Shift+U** toggles media blur, **Alt+Shift+F** filters or unfilters the current site, **Alt+Shift+H** removes today’s matching visits (change them from Settings → Keyboard shortcuts)
+- Turning on **Filter this site** now also removes earlier visits to that site (and its subdomains) right away
+- Toolbar badge: a discreet dot on tabs whose site is filtered, and `OFF` while the extension is turned off
+- Popup shows how many visits were removed today and in total (stored only on this device)
+- Settings → Backup: export your switches and site lists to a JSON file and import them on another browser (history is never included)
+
+### Fixed
+- The weekly adult-site list alarm was recreated every time the service worker woke up, so it kept getting pushed back
+- Failed or timed-out image checks were cached as “safe” for the rest of the session; they are now retried
+- The image result cache is capped (LRU) and keyed by threshold, so memory stays bounded and threshold changes take effect
+
+### Security
+- `nsfwjs` 2.4.2 → 4.4.0: drops the `@nsfw-filter/gif-frames` → `request` / `jpeg-js` chain behind the critical and high advisories. Predictions on the bundled model are identical
+- Build tooling: `copy-webpack-plugin` 14 (`serialize-javascript`), `sharp` 0.35 (libvips/libheif/librsvg CVEs), plus `npm audit fix` in both packages (vite, undici, qs, form-data, tough-cookie, and others)
+- CI actions moved to Node 24 majors (`checkout`, `setup-node`, `upload-artifact` v7)
+
+### Docs
+- README rewritten with screenshots of the popup, settings, and blur; privacy policy updated for stats, backups, and image re-reads
+
+### Removed
+- Unused title/URL heuristic module left over from 2.0.11
+
 ## [2.0.12] — 2026-10-16
 
 ### Changed

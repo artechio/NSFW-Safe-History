@@ -56,6 +56,61 @@ export function clearHistory(range: CleanRange) {
   })
 }
 
+export function setSiteFilter(hostname: string, enabled: boolean) {
+  return sendMessage<SiteStatus & { deleted?: number }>({
+    action: "SET_SITE_FILTER",
+    hostname,
+    enabled,
+  })
+}
+
+export type Stats = {
+  removedTotal: number
+  removedToday: number
+  since: number
+  error?: string
+}
+
+export function getStats() {
+  return sendMessage<Stats>({ action: "GET_STATS" })
+}
+
+export function exportSettings() {
+  return sendMessage<{ ok: boolean; backup?: unknown; error?: string }>({
+    action: "EXPORT_SETTINGS",
+  })
+}
+
+export function importSettings(backup: string) {
+  return sendMessage<{
+    ok: boolean
+    settings?: ExtensionSettings
+    error?: string
+  }>({ action: "IMPORT_SETTINGS", backup })
+}
+
+export type Shortcut = { name: string; description: string; shortcut: string }
+
+export function getShortcuts(): Promise<Shortcut[]> {
+  return new Promise((resolve) => {
+    if (!chrome.commands?.getAll) {
+      resolve([])
+      return
+    }
+    chrome.commands.getAll((commands) => {
+      resolve(
+        commands
+          .filter((command) => command.name && command.name !== "_execute_action")
+          .map((command) => ({
+            name: command.name || "",
+            description: command.description || "",
+            shortcut: command.shortcut || "",
+          }))
+      )
+    })
+  })
+}
+
 export function updateBlocklist() {
   return sendMessage<{ ok: boolean; count?: number; error?: string }>({
     action: "UPDATE_BLOCKLIST",

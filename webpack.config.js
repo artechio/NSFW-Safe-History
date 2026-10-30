@@ -25,7 +25,7 @@ module.exports = {
         { from: 'src/offscreen.js', to: 'offscreen.js' },
         { from: 'content.css', to: 'content.css' },
         { from: 'assets', to: 'assets' },
-        { from: 'node_modules/nsfwjs/dist/nsfwjs.min.js', to: 'assets/vendor/nsfwjs.min.js' }
+        { from: 'node_modules/nsfwjs/dist/browser/nsfwjs.min.js', to: 'assets/vendor/nsfwjs.min.js' }
       ]
     })
   ]

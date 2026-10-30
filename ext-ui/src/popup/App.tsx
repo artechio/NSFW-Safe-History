@@ -26,9 +26,16 @@ import {
   getActivePage,
   getSiteStatus,
   getSettings,
+  getStats,
+  setSiteFilter,
   updateSettings,
   type CleanRange,
+  type Stats,
 } from "@/lib/extension"
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat().format(value)
+}
 
 export function PopupApp() {
   const [loading, setLoading] = useState(true)
@@ -37,9 +44,9 @@ export function PopupApp() {
   const [pageSupported, setPageSupported] = useState(false)
   const [enabled, setEnabled] = useState(true)
   const [filterSite, setFilterSite] = useState(false)
-  const [inBlocklist, setInBlocklist] = useState(false)
   const [blurEnabled, setBlurEnabled] = useState(false)
   const [range, setRange] = useState<CleanRange>("week")
+  const [stats, setStats] = useState<Stats | null>(null)
   const version = useMemo(() => chrome.runtime.getManifest().version, [])
 
   useEffect(() => {
@@ -53,16 +60,19 @@ export function PopupApp() {
         setRange(settings.lastCleanRange || "week")
         if (!page.supported || !page.hostname) {
           setFilterSite(false)
-          setInBlocklist(false)
           return
         }
         const status = await getSiteStatus(page.hostname)
         if (status.error) throw new Error(status.error)
         setFilterSite(Boolean(status.filterActive))
-        setInBlocklist(Boolean(status.inBlocklist))
       })
       .catch(() => toast.error("Could not load settings"))
       .finally(() => setLoading(false))
+    getStats()
+      .then((response) => {
+        if (!response.error) setStats(response)
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -70,6 +80,14 @@ export function PopupApp() {
       changes: { [key: string]: chrome.storage.StorageChange },
       area: string
     ) {
+      if (area === "local" && changes.stats) {
+        getStats()
+          .then((response) => {
+            if (!response.error) setStats(response)
+          })
+          .catch(() => {})
+        return
+      }
       if (area !== "sync") return
       if (changes.enabled && typeof changes.enabled.newValue === "boolean") {
         setEnabled(changes.enabled.newValue)
@@ -82,7 +100,6 @@ export function PopupApp() {
           .then((status) => {
             if (status.error) return
             setFilterSite(Boolean(status.filterActive))
-            setInBlocklist(Boolean(status.inBlocklist))
           })
           .catch(() => {})
       }
@@ -95,26 +112,20 @@ export function PopupApp() {
     if (!host || !pageSupported) return
     setFilterSite(checked)
     try {
-      const settings = await getSettings()
-      const included = new Set(settings.customDomains || [])
-      const excluded = new Set(settings.excludedSites || [])
-      if (checked) {
-        excluded.delete(host)
-        if (!inBlocklist) included.add(host)
-      } else {
-        included.delete(host)
-        if (inBlocklist) excluded.add(host)
+      const status = await setSiteFilter(host, checked)
+      if (status.error) throw new Error(status.error)
+      setFilterSite(Boolean(status.filterActive))
+      const deleted = Number(status.deleted) || 0
+      if (deleted > 0) {
+        toast.success(
+          `Removed ${formatCount(deleted)} earlier ${deleted === 1 ? "visit" : "visits"} to this site.`
+        )
       }
-      await updateSettings({
-        customDomains: [...included],
-        excludedSites: [...excluded],
-      })
     } catch {
       toast.error("Could not update this site")
       try {
         const status = await getSiteStatus(host)
         setFilterSite(Boolean(status.filterActive))
-        setInBlocklist(Boolean(status.inBlocklist))
       } catch {
         // ignore
       }
@@ -131,7 +142,10 @@ export function PopupApp() {
   }
 
   function reportClearResult(deleted: number) {
-    if (deleted > 0) toast.success("Matching visits removed.")
+    if (deleted > 0)
+      toast.success(
+        `Removed ${formatCount(deleted)} matching ${deleted === 1 ? "visit" : "visits"}.`
+      )
     else toast.message("No matching visits found for this period.")
   }
 
@@ -298,6 +312,27 @@ export function PopupApp() {
             </Button>
           </CardContent>
         </Card>
+
+        {stats ? (
+          <div className="grid grid-cols-2 gap-2" aria-label="Cleanup stats">
+            <div className="bg-muted/50 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+              <span className="text-sm font-semibold tabular-nums">
+                {formatCount(stats.removedToday)}
+              </span>
+              <span className="text-muted-foreground text-[11px] leading-snug">
+                Removed today
+              </span>
+            </div>
+            <div className="bg-muted/50 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+              <span className="text-sm font-semibold tabular-nums">
+                {formatCount(stats.removedTotal)}
+              </span>
+              <span className="text-muted-foreground text-[11px] leading-snug">
+                Removed in total
+              </span>
+            </div>
+          </div>
+        ) : null}
 
         <Separator />
 

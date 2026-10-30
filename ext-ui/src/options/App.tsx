@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Loading03Icon, RefreshIcon } from "@hugeicons/core-free-icons"
+import {
+  Download01Icon,
+  KeyboardIcon,
+  Loading03Icon,
+  RefreshIcon,
+  Upload01Icon,
+} from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { FooterLinks } from "@/components/footer-links"
@@ -26,10 +32,14 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  exportSettings,
   getSettings,
+  getShortcuts,
+  importSettings,
   updateBlocklist,
   updateSettings,
   type ExtensionSettings,
+  type Shortcut,
 } from "@/lib/extension"
 
 function lines(value: string) {
@@ -60,6 +70,8 @@ export function OptionsApp() {
   const [settings, setSettings] = useState<ExtensionSettings | null>(null)
   const [customDomains, setCustomDomains] = useState("")
   const [excludedSites, setExcludedSites] = useState("")
+  const [shortcuts, setShortcuts] = useState<Shortcut[]>([])
+  const fileInput = useRef<HTMLInputElement>(null)
   const version = useMemo(() => chrome.runtime.getManifest().version, [])
 
   function applySettings(response: ExtensionSettings & { error?: string }) {
@@ -74,6 +86,9 @@ export function OptionsApp() {
       .then(applySettings)
       .catch(() => toast.error("Could not load settings"))
       .finally(() => setLoading(false))
+    getShortcuts()
+      .then(setShortcuts)
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -153,6 +168,45 @@ export function OptionsApp() {
       toast.error("Could not update the adult-site list")
     } finally {
       setUpdatingList(false)
+    }
+  }
+
+  async function onExport() {
+    try {
+      const response = await exportSettings()
+      if (!response?.ok || !response.backup) throw new Error("export failed")
+      const blob = new Blob([JSON.stringify(response.backup, null, 2)], {
+        type: "application/json",
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `nsfw-safe-history-settings-${new Date().toISOString().slice(0, 10)}.json`
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      toast.success("Settings exported")
+    } catch {
+      toast.error("Could not export settings")
+    }
+  }
+
+  async function onImportFile(file: File | undefined) {
+    if (!file) return
+    try {
+      const response = await importSettings(await file.text())
+      if (!response?.ok || !response.settings) {
+        throw new Error(response?.error || "import failed")
+      }
+      applySettings(response.settings)
+      toast.success("Settings imported")
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? `Could not import settings: ${error.message}`
+          : "Could not import settings"
+      )
+    } finally {
+      if (fileInput.current) fileInput.current.value = ""
     }
   }
 
@@ -383,6 +437,68 @@ export function OptionsApp() {
               )}
               Update adult-site list
             </Button>
+          </CardFooter>
+        </Card>
+
+        <Card size="sm" className="gap-3 py-3">
+          <CardHeader>
+            <CardTitle>Keyboard shortcuts</CardTitle>
+            <CardDescription>
+              Work from any tab without opening the popup.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-col gap-2">
+              {shortcuts.map((shortcut) => (
+                <li
+                  key={shortcut.name}
+                  className="flex items-center justify-between gap-4 text-xs"
+                >
+                  <span>{shortcut.description}</span>
+                  <kbd className="bg-muted text-muted-foreground shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[11px]">
+                    {shortcut.shortcut || "Not set"}
+                  </kbd>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+          <CardFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                chrome.tabs.create({ url: "chrome://extensions/shortcuts" })
+              }
+            >
+              <HugeiconsIcon icon={KeyboardIcon} data-icon="inline-start" />
+              Change shortcuts
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card size="sm" className="gap-3 py-3">
+          <CardHeader>
+            <CardTitle>Backup</CardTitle>
+            <CardDescription>
+              Save your switches and site lists to a file, or restore them on
+              another browser. Your history is never included.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={onExport}>
+              <HugeiconsIcon icon={Download01Icon} data-icon="inline-start" />
+              Export settings
+            </Button>
+            <Button variant="outline" onClick={() => fileInput.current?.click()}>
+              <HugeiconsIcon icon={Upload01Icon} data-icon="inline-start" />
+              Import settings
+            </Button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(event) => onImportFile(event.target.files?.[0])}
+            />
           </CardFooter>
         </Card>
 
