@@ -2,6 +2,15 @@
 
 All notable changes to NSFW Safe History are documented here.
 
+## [2.1.1] — 2026-11-14
+
+### Fixed
+- With blur on, videos and embedded frames on ordinary sites could be blurred without ever being checked — for example stream previews on hover, cross-origin players, and ads in iframes. On sites that are not filtered, media is now blurred only after the on-device model flags it
+- A video on an unfiltered site is blurred only when two frames taken a moment apart are both flagged, so one odd frame of a live stream no longer blurs it
+
+### Known limits
+- On unfiltered sites, videos served from another domain without CORS cannot be read by the page, so they are left unblurred instead of guessed at. Filtered sites still blur all media straight away
+
 ## [2.1.0] — 2026-10-30
 
 ### Added
