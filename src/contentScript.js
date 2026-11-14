@@ -1,7 +1,9 @@
 const { hostLooksLikeCaptcha, urlLooksLikeCaptcha, elementLooksLikeCaptcha } = require('./lib/captcha');
+const { planMedia, needsSecondFrame } = require('./lib/mediaPolicy');
 
 const MIN_IMAGE_SIZE = 64;
 const MIN_AD_SIZE = 40;
+const SECOND_FRAME_DELAY_MS = 1500;
 const elementsByUrl = new Map();
 const queued = new Set();
 const decided = new Map();
@@ -46,10 +48,6 @@ function captureVideoFrame(video) {
     } catch (error) {
         return '';
     }
-}
-
-function isClassifiable(url) {
-    return /^https?:/i.test(url) || (typeof url === 'string' && url.startsWith('data:image/'));
 }
 
 function elementSizeOk(element, minimum) {
@@ -134,17 +132,19 @@ function enqueue(element) {
     if (!filteringActive()) return;
     if (shouldSkipBlur(element)) return;
 
-    if (siteListed) {
+    const url = siteListed ? '' : imageUrl(element);
+    const plan = planMedia({ tag: element.tagName, siteListed, url });
+    if (plan === 'blur') {
         applyBlur(element);
         return;
     }
+    if (plan === 'skip' || urlLooksLikeCaptcha(url)) return;
 
-    const url = imageUrl(element);
-    if (!isClassifiable(url)) {
-        if (element.tagName === 'VIDEO' || element.tagName === 'IFRAME') applyBlur(element);
+    if (needsSecondFrame(element.tagName, Boolean(element.poster))) {
+        checkVideoFrames(element, url);
         return;
     }
-    if (urlLooksLikeCaptcha(url)) return;
+
     remember(url, element);
 
     if (decided.has(url)) {
@@ -155,6 +155,26 @@ function enqueue(element) {
     queued.add(url);
     pending.push(url);
     scheduleFlush();
+}
+
+function classifyOne(url) {
+    return sendMessage({ action: 'CLASSIFY_URLS', urls: [url] })
+        .then(response => Boolean(response && response.results && response.results[0] && response.results[0].nsfw))
+        .catch(() => false);
+}
+
+// Blur a video only when two frames taken a moment apart are both flagged.
+async function checkVideoFrames(video, firstFrame) {
+    if (video.dataset.nsfwVideoCheck === '1') return;
+    video.dataset.nsfwVideoCheck = '1';
+    try {
+        if (!(await classifyOne(firstFrame))) return;
+        await new Promise(resolve => setTimeout(resolve, SECOND_FRAME_DELAY_MS));
+        const secondFrame = captureVideoFrame(video) || firstFrame;
+        if (filteringActive() && await classifyOne(secondFrame)) applyBlur(video);
+    } finally {
+        delete video.dataset.nsfwVideoCheck;
+    }
 }
 
 function readyToScan(element) {

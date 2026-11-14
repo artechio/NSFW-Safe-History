@@ -52,6 +52,7 @@ Blur is **off by default**. Turn it on from the popup or with <kbd>Alt</kbd>+<kb
 
 - **On sites you filter:** every image, video and media ad is blurred straight away.
 - **On other sites:** visible media is classified locally, and blurred only when the `Porn` or `Hentai` score reaches your threshold. `Sexy` alone never triggers a blur.
+  Nothing is blurred without a positive result. Videos need two flagged frames a moment apart, and media the page can't read (such as videos served from another domain without CORS) is left alone.
 - **To reveal one item:** click it.
 
 | Blur off | Blur on (filtered site) |
