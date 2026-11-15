@@ -2,6 +2,11 @@
 
 All notable changes to NSFW Safe History are documented here.
 
+## [2.1.2] — 2026-11-15
+
+### Fixed
+- On mobile browsers (Edge for Android), the popup now fills the sheet's full width instead of a fixed 360px column. Desktop popups keep their size
+
 ## [2.1.1] — 2026-11-14
 
 ### Fixed
