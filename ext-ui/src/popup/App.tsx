@@ -33,6 +33,13 @@ import {
   type Stats,
 } from "@/lib/extension"
 
+// Mobile browsers show the popup as a full-width sheet; desktop popups size to the content.
+function isMobileBrowser() {
+  const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData
+  if (typeof uaData?.mobile === "boolean") return uaData.mobile
+  return /Android|Mobi/i.test(navigator.userAgent)
+}
+
 function formatCount(value: number) {
   return new Intl.NumberFormat().format(value)
 }
@@ -48,6 +55,7 @@ export function PopupApp() {
   const [range, setRange] = useState<CleanRange>("week")
   const [stats, setStats] = useState<Stats | null>(null)
   const version = useMemo(() => chrome.runtime.getManifest().version, [])
+  const mobile = useMemo(isMobileBrowser, [])
 
   useEffect(() => {
     Promise.all([getSettings(), getActivePage()])
@@ -192,8 +200,14 @@ export function PopupApp() {
       : "Excluded from filtering. Visits stay in your history."
 
   return (
-    <div className="bg-background text-foreground w-[360px]">
-      <div className="flex flex-col gap-3 p-3">
+    <div
+      className={
+        mobile
+          ? "bg-background text-foreground min-h-screen w-full"
+          : "bg-background text-foreground w-[360px]"
+      }
+    >
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-3 p-3">
         <header className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
             <img
